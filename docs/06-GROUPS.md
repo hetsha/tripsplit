@@ -44,9 +44,9 @@ stateDiagram-v2
 | url_token | VARCHAR(8) | Yes | generated | URL-friendly token |
 | name | VARCHAR(150) | No | — | Group name |
 | description | TEXT | Yes | NULL | Group description |
-| starting_money | DECIMAL(12,2) | No | 0.00 | **Legacy field** — not used in current product. See note below. |
-| starting_payer_id | INT UNSIGNED FK | Yes | NULL | Who contributed starting money |
-| starting_payment_method | ENUM | No | 'cash' | Payment method for starting money |
+| starting_money | DECIMAL(12,2) | No | 0.00 | **LEGACY** — not used in current product. Retained for DB backward compatibility. |
+| starting_payer_id | INT UNSIGNED FK | Yes | NULL | **LEGACY** — not used in current product. |
+| starting_payment_method | ENUM | No | 'cash' | **LEGACY** — not used in current product. |
 | currency | VARCHAR(10) | No | 'INR' | Currency code |
 | currency_symbol | VARCHAR(5) | No | '₹' | Currency symbol |
 | created_by | INT UNSIGNED FK | No | — | Owner user ID |

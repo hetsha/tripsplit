@@ -380,7 +380,9 @@ This document specifies every REST API endpoint. For each: method, URL, authenti
 
 ## 6. Personal Finance APIs
 
-### `GET /api/cashbook.php`
+> **Migration Note**: The current implementation uses `api/cashbook.php` with legacy naming. This endpoint will be migrated to `api/personal-finance.php` (or similar) in Phase 5. The contract below describes the target API. Existing clients may still depend on legacy response fields from `api/cashbook.php`.
+
+### `GET /api/cashbook.php` (legacy) → Target: `GET /api/personal-finance.php`
 
 **Response 200**:
 ```json
@@ -448,9 +450,11 @@ This document specifies every REST API endpoint. For each: method, URL, authenti
 
 ## 8. Dashboard API
 
+> **Migration Note**: The current implementation (`api/dashboard.php`) still returns legacy fields `trip_money` and `my_cashbook` from the old CashBook model. These will be removed in Phase 5. The contract below describes the target response.
+
 ### `GET /api/dashboard.php`
 
-**Response 200**:
+**Response 200** (target):
 ```json
 {
   "success": true,
@@ -463,6 +467,10 @@ This document specifies every REST API endpoint. For each: method, URL, authenti
   }
 }
 ```
+
+**Legacy fields still returned by current implementation** (to be removed in Phase 5):
+- `trip_money` — old shared pool tracking
+- `my_cashbook` — old personal cashbook ledger
 
 ---
 

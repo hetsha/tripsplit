@@ -192,32 +192,68 @@ This document specifies the phased development plan with objectives, dependencie
 
 - First-class personal finance module
 - Income/expense tracking
-- Personal finance ledger
+- Migrate away from legacy CashBook APIs
 
 ### Dependencies
 
 - Phase 1 complete (independent of groups)
 
+### Migration Boundary
+
+This phase is the **critical migration point** where legacy CashBook code is replaced.
+
+**Before Phase 5**:
+- `api/cashbook.php` serves personal finance (legacy naming, legacy logic)
+- `api/dashboard.php` returns `trip_money` and `my_cashbook` (legacy fields)
+- `includes/calculations.php` contains `getTripMoneySummary()` and `getUserCashbookLedger()` (legacy functions)
+- `index.php` contains CashBook UI elements (legacy UI)
+
+**After Phase 5**:
+- New `api/personal-finance.php` (or `api/personal-expenses.php`) replaces `api/cashbook.php`
+- `api/dashboard.php` no longer returns `trip_money` or `my_cashbook`
+- Legacy functions in `calculations.php` are removed or marked `@deprecated`
+- CashBook UI elements replaced with personal finance UI
+- `api/cashbook.php` retained temporarily as compatibility redirect
+
 ### Deliverables
 
-| Deliverable | Files |
-|-------------|-------|
-| Add personal expense | `api/cashbook.php`, `10-PERSONAL-EXPENSES.md` |
-| Add personal income | `api/cashbook.php` |
-| Transaction history | `api/cashbook.php` |
-| Running balance | `api/passbook.php` |
-| Personal categories | `api/categories.php` |
-| Personal dashboard | Web + Flutter |
+| Deliverable | Files | Notes |
+|-------------|-------|-------|
+| New personal finance API | `api/personal-finance.php` (new) | Replaces `api/cashbook.php` |
+| Legacy endpoint redirect | `api/cashbook.php` | Redirect to new API for backward compat |
+| Add personal expense | `api/personal-finance.php`, `10-PERSONAL-EXPENSES.md` | |
+| Add personal income | `api/personal-finance.php` | |
+| Transaction history | `api/personal-finance.php` | |
+| Running balance | `api/passbook.php` | |
+| Personal categories | `api/categories.php` | |
+| Clean dashboard API | `api/dashboard.php` | Remove `trip_money`, `my_cashbook` |
+| Remove legacy calculations | `includes/calculations.php` | Remove `getTripMoneySummary()`, `getUserCashbookLedger()` |
+| Personal dashboard UI | Web + Flutter | Replace CashBook UI elements |
 
 ### Database Changes
 
 - None (uses existing `transactions` with `trip_id=NULL`)
+- `starting_money`, `starting_payer_id`, `starting_payment_method` columns remain in `trips` table for backward compatibility but are ignored
 
 ### Tests
 
 - Personal expense/income CRUD
 - Balance calculation
 - Category management
+- Legacy endpoint compatibility (cashbook.php redirects work)
+- Dashboard response no longer contains legacy fields
+
+### Pre-Migration Safety Net
+
+Before removing legacy CashBook code, ensure test coverage for:
+
+1. F3 balance formula: A pays ₹1500, split 3 ways, B pays A ₹500, C pays A ₹500, everyone reaches zero
+2. Partial settlement
+3. Multiple creditors / multiple debtors
+4. Circular debts
+5. Settlement reversal
+6. Decimal/rounding edge cases
+7. **Invariant**: `SUM(all member net_balance) == 0` for every valid group state
 
 ---
 

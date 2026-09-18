@@ -292,6 +292,73 @@ The existing database schema (`sql/schema.sql`) contains 13 tables. The full spe
 
 ---
 
+## Migration State
+
+The repository is currently in a **migration state**. The documentation specifies the desired product direction, but the codebase still contains legacy implementation from the old "CashBook + Splitwise" product concept.
+
+### Current State
+
+```
+┌─────────────────────┐
+│   New Specs (docs/) │  ← Product direction defined here
+│                     │
+│  Group Split        │
+│  Personal Finance   │
+│  Settlements        │
+└─────────┬───────────┘
+          │
+┌─────────▼───────────┐
+│   PHP Backend       │  ← Contains BOTH new and legacy code
+│                     │
+│  NEW + LEGACY       │
+└─────────┬───────────┘
+          │
+   ┌──────┼──────┐
+   ▼      ▼      ▼
+ New    Legacy  Legacy
+ Balance CashBook DB
+ Calc    APIs/UI Columns
+   │      │      │
+   └──────┴──────┘
+          │
+       MySQL
+```
+
+### What Is Legacy (Do NOT Use for New Features)
+
+| Component | Location | Status | Migration Target |
+|-----------|----------|--------|-----------------|
+| `getTripMoneySummary()` | `includes/calculations.php` | **LEGACY** | Remove in Phase 5 |
+| `getUserCashbookLedger()` | `includes/calculations.php` | **LEGACY** | Replace with personal finance queries |
+| `starting_money` field | `trips` table | **LEGACY** | Keep for DB compat, ignore in logic |
+| `starting_payer_id` field | `trips` table | **LEGACY** | Keep for DB compat, ignore in logic |
+| `starting_payment_method` field | `trips` table | **LEGACY** | Keep for DB compat, ignore in logic |
+| `paid_from_pool` field | `transactions` table | **LEGACY** | Keep for DB compat, ignore in logic |
+| `api/cashbook.php` | API endpoint | **LEGACY** | Migrate to `api/personal-finance.php` |
+| `api/dashboard.php` `trip_money` | API response field | **LEGACY** | Remove in Phase 5 |
+| `api/dashboard.php` `my_cashbook` | API response field | **LEGACY** | Remove in Phase 5 |
+| CashBook UI elements | `index.php` | **LEGACY** | Replace in Phase 5 |
+
+### What Is New (Use for All New Development)
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| F3 balance formula | `includes/calculations.php` `getSplitwiseBalances()` | **CURRENT** |
+| Debt simplification | `includes/calculations.php` `calculateSimplifiedSettlements()` | **CURRENT** |
+| Expense CRUD | `api/expenses.php` | **CURRENT** |
+| Settlement recording | `api/settlements.php` | **CURRENT** |
+| Group management | `api/trips.php`, `api/members.php` | **CURRENT** |
+
+### API Contract Mismatch
+
+The canonical API specification (`21-API-SPECIFICATION.md`) describes the **target** API contract. The actual running endpoints may still return legacy fields. During migration:
+
+- **New development** must follow `21-API-SPECIFICATION.md`
+- **Existing clients** may still depend on legacy response fields
+- **Do not remove** legacy fields until Phase 5 migration is complete and clients are updated
+
+---
+
 ## Open Questions
 
 | # | Question | Impact | Document |

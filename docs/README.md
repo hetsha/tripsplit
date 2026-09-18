@@ -73,6 +73,23 @@ The files are numbered by layer, from high-level product definition down to impl
 
 ---
 
+## Migration State
+
+The documentation specifies the **target product direction**. The codebase is in a migration state where legacy CashBook code coexists with new implementation.
+
+**Key principle**: Documentation is ahead of implementation. This is intentional — docs define where we're going, code gets there incrementally.
+
+See `00-PROJECT-OVERVIEW.md` → "Migration State" section for the full legacy/new code mapping.
+
+### What This Means for Developers
+
+- **New feature development** must follow the specs in this documentation folder
+- **Legacy code** (CashBook APIs, `starting_money` logic) still runs but is marked for removal
+- **Do not extend legacy code** — implement new features using the patterns in the specs
+- **API contract mismatch is expected** — `21-API-SPECIFICATION.md` describes the target; actual endpoints may still return legacy fields
+
+---
+
 ## Documentation Rules
 
 1. Every file ends with **Dependencies**, **Related Documents**, and **Open Questions** sections.
