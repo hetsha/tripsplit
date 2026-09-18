@@ -16,11 +16,13 @@ See `08-SPLIT-METHODS.md` for detailed rounding rules per split method.
 
 ## Expense Types
 
-| Type | Description | Affects Group Pool | Affects Balances |
-|------|-------------|-------------------|------------------|
-| `expense` | Shared expense paid by one member | Yes (if during-trip) | Yes |
-| `income` | Money added to shared pool | Yes | Yes (payer balance) |
-| `settlement` | Payment between members | No | Yes (balances adjusted) |
+| Type | Description | Affects Balances |
+|------|-------------|------------------|
+| `expense` | Shared expense paid by one member | Yes |
+| `income` | Money added to shared pool (legacy — see note) | Yes (payer balance) |
+| `settlement` | Payment between members | Yes (balances adjusted) |
+
+> **Note**: The `income` type exists in the database for backward compatibility. In the current product, income is tracked only in the personal finance module (where `trip_id = NULL`). Shared group expenses do not use an income/pool model.
 
 ---
 
@@ -60,7 +62,7 @@ See `08-SPLIT-METHODS.md` for detailed rounding rules per split method.
 | paid_by | INT UNSIGNED FK | Yes | NULL | Who paid |
 | received_by | INT UNSIGNED FK | Yes | NULL | Who received (income/settlement) |
 | payment_method | ENUM | No | 'cash' | Payment method used |
-| paid_from_pool | TINYINT(1) | No | 1 | Deducted from shared pool? |
+| paid_from_pool | TINYINT(1) | No | 1 | **Legacy field** — always 1 for shared expenses in current product |
 | created_by | INT UNSIGNED FK | No | — | Who created the record |
 | transaction_date | DATETIME | No | — | When expense occurred |
 | notes | TEXT | Yes | NULL | Additional notes |
@@ -228,30 +230,18 @@ When an expense is edited:
 
 ---
 
-## 5. Pre-Trip vs During-Trip Expenses
+## 5. Pre-Trip vs During-Trip Expenses (REMOVED)
 
-### Pre-Trip Expenses
-
-- Expenses created before the trip officially starts
-- Update Splitwise balances (who owes whom)
-- Do NOT deduct from the shared money pool
-- `paid_from_pool = 0`
-
-### During-Trip Expenses
-
-- Expenses created during the trip
-- Update Splitwise balances
-- Deduct from the shared money pool
-- `paid_from_pool = 1`
+> **This section describes a legacy product concept that is NO LONGER part of TripBook.**
+>
+> In the current product, all shared expenses are treated equally regardless of timing. The `paid_from_pool` field exists in the database for backward compatibility but is not used in the current product logic.
 
 ### Balance Impact Summary
 
-| Expense Type | Splitwise Balances | Shared Pool |
-|-------------|-------------------|-------------|
-| Pre-trip expense | Adjusted | Not affected |
-| During-trip expense | Adjusted | Deducted |
-| Income | Adjusted (payer) | Added |
-| Settlement | Adjusted | Not affected |
+| Expense Type | Balances |
+|-------------|----------|
+| Shared expense | Adjusted per F3 formula |
+| Settlement | Adjusted per F3 formula |
 
 ---
 

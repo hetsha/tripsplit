@@ -173,7 +173,7 @@ Each screen entry follows this template:
 **UI Sections**:
 1. **Group Selector** (top bar): Current group name, tap to switch
 2. **Hero Balance Card**: Net balance (green if owed, red if owes), group name, currency
-3. **Quick Actions Row**: Add Expense (FAB), Add Income, CashBook, Passbook, Settle Up
+3. **Quick Actions Row**: Add Expense (FAB), Add Income, Passbook, Settle Up
 4. **Who Owes Whom Card**: Simplified settlement suggestions (from → to, amount)
 5. **Category Spending**: Top categories with amounts and progress bars
 6. **Member Balances**: List of members with net balance (color-coded)
@@ -390,10 +390,8 @@ Each screen entry follows this template:
 **UI Sections**:
 1. **Group Name Input**: Required, max 150 chars
 2. **Description Input**: Optional, max 500 chars
-3. **Starting Money Input**: Optional, with currency symbol
-4. **Starting Payment Method**: Chips (Cash, UPI, Card, Bank)
-5. **Currency Selector**: Default INR
-6. **"Create Group" button**
+3. **Currency Selector**: Default INR
+4. **"Create Group" button**
 
 **Buttons/Actions**:
 - "Create Group" → creates group, closes sheet, navigates to Group Details

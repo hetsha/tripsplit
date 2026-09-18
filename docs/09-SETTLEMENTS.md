@@ -14,7 +14,7 @@ The app RECORDS that "User A paid User B ₹500 via UPI." It does NOT process th
 
 ### F3 — Group Balance Formula
 
-> **net_balance = total_paid - total_share + settlements_received - settlements_sent**
+> **net_balance = total_paid - total_share - settlements_received + settlements_sent**
 
 Where:
 - `total_paid` = sum of all expense amounts this user paid for the group
@@ -41,7 +41,7 @@ total_share = SUM(expense_splits.user_id = user_id)
 settlements_sent = SUM(settlements.from_user = user_id AND status = 'paid')
 settlements_received = SUM(settlements.to_user = user_id AND status = 'paid')
 
-net_balance = (total_paid - total_share) + settlements_sent - settlements_received
+net_balance = (total_paid - total_share) - settlements_received + settlements_sent
 ```
 
 ### Example

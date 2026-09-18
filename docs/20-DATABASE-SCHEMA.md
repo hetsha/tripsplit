@@ -89,7 +89,7 @@ The current implementation has 13 tables. The specification below expands to cov
 | url_token | VARCHAR(8) UNIQUE | Yes | NULL | INDEX | URL-friendly token |
 | name | VARCHAR(150) | No | — | — | Group name |
 | description | TEXT | Yes | NULL | — | Description |
-| starting_money | DECIMAL(12,2) | No | 0.00 | — | Initial cash pool |
+| starting_money | DECIMAL(12,2) | No | 0.00 | — | **Legacy field** — not used in current product. Groups do not have a shared cash pool. |
 | starting_payer_id | INT UNSIGNED FK | Yes | NULL | — | Starting money contributor |
 | starting_payment_method | ENUM('cash','upi','card','bank','other') | No | 'cash' | — | Starting payment method |
 | currency | VARCHAR(10) | No | 'INR' | — | Currency code |
@@ -140,7 +140,7 @@ The current implementation has 13 tables. The specification below expands to cov
 | paid_by | INT UNSIGNED FK | Yes | NULL | INDEX | Who paid |
 | received_by | INT UNSIGNED FK | Yes | NULL | — | Who received |
 | payment_method | ENUM | No | 'cash' | — | Payment method |
-| paid_from_pool | TINYINT(1) | No | 1 | — | Deducted from pool? |
+| paid_from_pool | TINYINT(1) | No | 1 | — | **Legacy field** — always 1 for shared expenses in current product |
 | is_personal | TINYINT(1) | No | 0 | — | Personal expense flag |
 | client_request_id | VARCHAR(36) | Yes | NULL | UNIQUE | Idempotency key |
 | whatsapp_message_id | VARCHAR(100) | Yes | NULL | INDEX | WhatsApp dedup key |

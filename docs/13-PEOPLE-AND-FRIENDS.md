@@ -61,7 +61,7 @@ Default: Sort by most recent interaction, then alphabetically.
 
 ```
 For each mutual group:
-  net_balance = (user_paid - user_share) + settlements_received - settlements_sent
+  net_balance = (user_paid - user_share) - settlements_received + settlements_sent
   (F3 formula applied per group)
 ```
 

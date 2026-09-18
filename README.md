@@ -1,30 +1,35 @@
-# TripBook - CashBook + Splitwise
+# TripBook - Shared Expense Management
 
-A mobile-first shared trip expense management and cash tracking web application built with **Core PHP 8+**, **MySQL**, **Vanilla JavaScript**, and **CSS3**.
+A mobile-first shared expense management and personal finance tracking web application built with **Core PHP 8+**, **MySQL**, **Vanilla JavaScript**, and **CSS3**.
 
 ---
 
 ## Key Features
 
-1. **Dual Independent Accounting Engines**:
-   - **CashBook Engine (Shared Trip Money)**: Tracks starting cash pool, money added, and on-trip spend with exact payment method breakdown (Cash, UPI, Card, Bank).
-   - **Splitwise Engine (Who Owes Whom)**: Tracks member expense payments, equal and custom splits, net balances, and smart greedy debt-simplification settlements.
-2. **Pre-Trip vs During-Trip Expense Scope**:
-   - **Pre-Trip Advance Expenses**: Updates Splitwise balances & settlements without deducting from the active Shared Trip Money pool.
-   - **During-Trip Expenses**: Deducts from the Shared Trip Money pool and updates Splitwise balances.
-3. **Member Personal Wallets**:
-   - Tracks each member's personal spend across payment channels (Cash, UPI, Card, Bank).
-4. **Smart Settlement Engine**:
-   - Minimal transactions algorithm matching debtors and creditors.
-   - Settlements clear debt without double-counting as a new expense or altering the Shared Trip Money pool.
-   - Comprehensive formula: `net_balance = (total_paid - total_share) + settlements_received - settlements_sent`.
+1. **Shared Expense Management (Split Karo-style)**:
+   - Add, edit, delete shared expenses with 5 split methods (equal, exact, percentage, shares, item-wise).
+   - Track who paid, who participated, and how the expense is divided.
+   - Smart greedy debt-simplification algorithm for minimal settlements.
+2. **Personal Expense & Income Tracking**:
+   - First-class personal finance module with categories, analytics, and running balance.
+   - Independent of group expenses — tracked with `trip_id = NULL`.
+3. **Settlement Recording**:
+   - Record person-to-person payments (cash, UPI, card, bank).
+   - Settlements adjust balances without creating new expenses.
+   - Comprehensive formula: `net_balance = total_paid - total_share - settlements_received + settlements_sent`.
+4. **Multiple Split Methods**:
+   - Equal, exact amount, percentage, shares/ratio, and item-wise splitting.
+   - Backend validates that all splits sum to the expense total (F1 invariant).
 5. **Incremental Live Sync**:
    - Background polling every 6 seconds checks a lightweight hash token (`api/sync.php`) to refresh data without jarring full-page reloads.
 6. **Mobile-First UX**:
    - Tailored for 360px, 375px, 390px, 412px, 430px, tablet, and desktop centered container.
    - Sticky bottom navigation: `Home`, `History`, `People`, `Settle`, `More`.
    - Floating Action Button (+ Expense), bottom sheets, and live custom split balance validation.
-   - 1-tap fast user switcher between members.
+7. **WhatsApp Integration** (planned):
+   - Manage expenses via WhatsApp messages with guided and natural-language flows.
+8. **AI Assistance** (planned):
+   - Hybrid AI layer for intent parsing, receipt OCR, and smart suggestions.
 
 ---
 

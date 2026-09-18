@@ -192,7 +192,7 @@ This document specifies the phased development plan with objectives, dependencie
 
 - First-class personal finance module
 - Income/expense tracking
-- CashBook ledger
+- Personal finance ledger
 
 ### Dependencies
 

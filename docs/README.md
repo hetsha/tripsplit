@@ -98,7 +98,7 @@ The files are numbered by layer, from high-level product definition down to impl
 | **Settlement** | A recorded payment that clears debt between two users |
 | **Split** | How an expense is divided among participants |
 | **Personal Expense** | An expense tracked for the user only, not shared with any group |
-| **CashBook** | The shared money pool tracking within a group |
+| ~~CashBook~~ | **Removed** — Groups do not have a shared cash pool. This term is no longer used. |
 | **Balance** | Net amount a user owes or is owed within a group |
 
 ---
@@ -111,7 +111,7 @@ These invariants are enforced by the backend and documented across multiple file
 |---|-----------|-------------|
 | F1 | `expense_total = Σ(participant_shares)` | `07-EXPENSES.md`, `08-SPLIT-METHODS.md`, `20-DATABASE-SCHEMA.md` |
 | F2 | `settlement = actual recorded transfer` | `09-SETTLEMENTS.md` |
-| F3 | `group_balance = paid - responsible + settlements_received - settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
+| F3 | `group_balance = paid - responsible - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
 | F4 | All financial operations are idempotent via `client_request_id` | `21-API-SPECIFICATION.md` |
 | F5 | Backend is the single source of truth for all financial calculations | All financial docs |
 

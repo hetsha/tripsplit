@@ -225,7 +225,7 @@ These invariants are non-negotiable. They are enforced by the backend and must b
 |---|-----------|---------|-------------|
 | F1 | Expense total equals sum of participant shares | `expense_total = Σ(share_amount)` | `07-EXPENSES.md`, `08-SPLIT-METHODS.md` |
 | F2 | Settlement equals actual recorded transfer | `settlement.amount = real_world_payment` | `09-SETTLEMENTS.md` |
-| F3 | Group balance follows the canonical formula | `balance = paid - responsible + settlements_received - settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
+| F3 | Group balance follows the canonical formula | `balance = paid - responsible - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
 | F4 | All financial operations are idempotent | `client_request_id` checked before insert | `21-API-SPECIFICATION.md` |
 | F5 | Backend is single source of truth | Clients display; backend computes | All financial docs |
 
@@ -250,7 +250,7 @@ A settlement record represents a real-world payment. It does NOT create new debt
 For any user in a group:
 
 ```
-net_balance = total_paid - total_share + settlements_received - settlements_sent
+net_balance = total_paid - total_share - settlements_received + settlements_sent
 ```
 
 Where:

@@ -125,7 +125,7 @@ VALUES (NULL, 'income', 50000.00, 'Monthly Salary', 1, 'bank', 1, NOW());
 
 ## 5. Transaction History
 
-### Personal CashBook Ledger
+### Personal Transaction Ledger
 
 The personal transaction history shows all income and expenses with a running balance.
 
@@ -144,7 +144,7 @@ The personal transaction history shows all income and expenses with a running ba
     "upi": 0.00
   },
   "out_by_method": {
-    "upi": 8000.00,
+    "upi": 4500.00,
     "cash": 2500.00,
     "card": 2000.00
   },
@@ -179,7 +179,6 @@ The personal transaction history shows all income and expenses with a running ba
 |-----------|-------------|
 | `income` | Money received |
 | `expense` | Money spent |
-| `starting_contribution` | Contributed to group starting pool |
 | `settlement_received` | Received settlement from group member |
 | `settlement_sent` | Sent settlement to group member |
 
@@ -350,11 +349,11 @@ See `18-RECEIPT-OCR.md` for OCR processing details.
 
 ---
 
-## 13. Running Balance (CashBook)
+## 13. Running Balance (Personal)
 
 ### Purpose
 
-Track the user's cash flow across all financial activities.
+Track the user's cash flow across all personal financial activities.
 
 ### Components
 
@@ -363,7 +362,6 @@ Track the user's cash flow across all financial activities.
 | Starting balance | Amount | Balance at beginning of period |
 | Income | +Amount | Money received |
 | Expenses | -Amount | Money spent |
-| Group contributions | -Amount | Money contributed to group pools |
 | Settlements received | +Amount | Money received from settlements |
 | Settlements sent | -Amount | Money sent as settlements |
 | Running total | Amount | Cumulative balance |

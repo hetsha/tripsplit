@@ -1,18 +1,18 @@
-# Implementation Plan - TripBook: CashBook + Splitwise
+# Implementation Plan - TripBook
 
-TripBook is a mobile-first financial management web application combining **CashBook** (real money & payment method tracking) and **Splitwise** (shared expense splitting, balance calculation, and smart debt settlement) for small groups traveling together.
+TripBook is a mobile-first financial management web application combining **shared expense management** (Split Karo/Splitwise-style expense splitting, balance calculation, and smart debt settlement) with **personal expense and income tracking** for individuals and groups.
+
+> **Note**: This plan was originally written for the old "CashBook + Splitwise" product concept. The current product direction is a Split Karo-style expense sharing app + personal finance tracker. The `starting_money` / CashBook concepts have been removed from the product. This plan is preserved for reference but the product definition has changed.
 
 ## Key Principles & Design Decisions
 
-1. **Clean Starting Money**: `starting_money` is stored directly on the `trips` record and attributed to the initial contributor, keeping the CashBook ledger pristine.
-2. **Two Independent Accounting Engines**:
-   - **Trip Cash / Money Ledger**: Starting Cash + Added Money - Total Expenses = Remaining Cash (also broken down by payment method: Cash, UPI, Card, Bank).
-   - **Splitwise Ledger**: Net balance = `Paid - Benefited Share + Settlement Adjustments`. Settlements are strictly person-to-person transfers and never inflate total trip expenses or alter trip cash.
+1. **Single Source of Truth**: The backend (PHP + MySQL) is the single source of truth for all financial calculations. Clients never compute authoritative financial balances independently.
+2. **Expense Splitting**: Net balance = `total_paid - total_share - settlements_received + settlements_sent`. Settlements are strictly person-to-person transfers and never create new expenses.
 3. **Payment Methods**: Every transaction records payment method (`cash`, `upi`, `card`, `bank`).
 4. **Incremental Live Sync**: Polling checks a lightweight version/timestamp token (`last_updated_at`), fetching and rendering only delta/updated sections without jarring full-page refreshes.
-5. **Dual Prominent Dashboard Cards**:
-   - **Trip Cash Card**: Remaining balance with quick payment method breakdown (Cash / UPI / Card).
-   - **Who Owes Whom Card**: Direct simplified settlement summary with 1-tap "Settle Up" action.
+5. **Dashboard Cards**:
+   - **Balance Card**: Net balance for the active group (green if owed, red if owes).
+   - **Who Owes Whom Card**: Simplified settlement summary with 1-tap "Settle Up" action.
 
 ---
 
@@ -35,7 +35,7 @@ TripBook is a mobile-first financial management web application combining **Cash
 - **`config/database.php`**: Secure PDO connection with utf8mb4, automatic DB creation helper if needed.
 - **`includes/auth.php`**: Session management, user auth, user switching, CSRF token management.
 - **`includes/calculations.php`**:
-  - `getTripSummary($tripId)`: Calculates Trip Cash (Starting + Added Money - Expenses), Payment method totals.
+  - `getTripSummary($tripId)`: Calculates group expense totals and summary statistics.
   - `getMemberBalances($tripId)`: Computes Total Paid, Total Share, Settlements Sent/Received, and Net Balance for each member.
   - `calculateSettlementSuggestions($tripId)`: Greedy debt-settlement simplification algorithm minimizing total transactions.
   - `getCategorySpending($tripId)`: Category breakdown.

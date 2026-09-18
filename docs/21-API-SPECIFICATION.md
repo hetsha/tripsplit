@@ -168,13 +168,13 @@ This document specifies every REST API endpoint. For each: method, URL, authenti
   "action": "create",
   "name": "Goa Trip",
   "description": "Trip to Goa",
-  "starting_money": 8000.00,
-  "starting_payment_method": "cash",
   "currency": "INR"
 }
 ```
 
-**Validation**: name required (1-150 chars), starting_money ≥ 0
+**Validation**: name required (1-150 chars)
+
+> **Note**: The `starting_money` and `starting_payment_method` fields exist in the database for backward compatibility but are not part of the current product. Groups do not have a shared cash pool.
 
 **Response 200**: `{ "success": true, "data": { "trip": {...} } }`
 
@@ -455,7 +455,6 @@ This document specifies every REST API endpoint. For each: method, URL, authenti
 {
   "success": true,
   "data": {
-    "trip_money": { "starting_money": 8000, "total_added_money": 0, "total_spent": 900, "available_shared_money": 7100, "payment_breakdown": {...} },
     "expense_summary": { "total_all_expenses": 900, "expense_count": 1 },
     "member_balances": [...],
     "who_owes_whom": [...],

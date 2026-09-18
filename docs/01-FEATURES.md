@@ -63,7 +63,7 @@ This document is the complete inventory of every feature in TripBook. Each featu
 | 2.11 | Remove member | P1 | W, A, B | Partially implemented | `06-GROUPS.md` |
 | 2.12 | Member roles (owner/admin/member) | P1 | W, A, B | Implemented | `06-GROUPS.md` |
 | 2.13 | Group currency setting | P1 | W, A, B | Implemented | `06-GROUPS.md` |
-| 2.14 | Starting money pool | P0 | W, A, B | Implemented | `06-GROUPS.md` |
+| 2.14 | ~~Starting money pool~~ | — | — | **Removed** | Legacy concept — groups do not have a shared cash pool |
 | 2.15 | Group settings | P1 | W, A, B | Not started | `06-GROUPS.md` |
 | 2.16 | Multiple groups per user | P0 | W, A, B | Implemented | `06-GROUPS.md` |
 | 2.17 | Switch active group | P0 | W, A, B | Implemented | `06-GROUPS.md` |
@@ -126,11 +126,11 @@ This document is the complete inventory of every feature in TripBook. Each featu
 
 | # | Feature | Priority | Platforms | Status | Spec |
 |---|---------|----------|-----------|--------|------|
-| 6.1 | Add personal expense | P0 | W, A, B | Partially (cashbook) | `10-PERSONAL-EXPENSES.md` |
-| 6.2 | Add personal income | P0 | W, A, B | Partially (cashbook) | `10-PERSONAL-EXPENSES.md` |
+| 6.1 | Add personal expense | P0 | W, A, B | Partially | `10-PERSONAL-EXPENSES.md` |
+| 6.2 | Add personal income | P0 | W, A, B | Partially | `10-PERSONAL-EXPENSES.md` |
 | 6.3 | Personal expense categories | P0 | W, A, B | Partially | `10-PERSONAL-EXPENSES.md` |
 | 6.4 | Custom personal categories | P1 | W, A, B | Not started | `10-PERSONAL-EXPENSES.md` |
-| 6.5 | Transaction history (personal) | P0 | W, A, B | Partially (cashbook) | `10-PERSONAL-EXPENSES.md` |
+| 6.5 | Transaction history (personal) | P0 | W, A, B | Partially | `10-PERSONAL-EXPENSES.md` |
 | 6.6 | Monthly summary | P1 | W, A, B | Not started | `10-PERSONAL-EXPENSES.md` |
 | 6.7 | Income vs expense view | P1 | W, A, B | Not started | `10-PERSONAL-EXPENSES.md` |
 | 6.8 | Spending trends | P2 | W, A, B | Not started | `10-PERSONAL-EXPENSES.md` |
@@ -139,7 +139,9 @@ This document is the complete inventory of every feature in TripBook. Each featu
 | 6.11 | Search/filter personal transactions | P1 | W, A, B | Partially | `10-PERSONAL-EXPENSES.md` |
 | 6.12 | Receipt attachment | P2 | W, A, B | Not started | `10-PERSONAL-EXPENSES.md` |
 | 6.13 | Payment method tracking | P0 | W, A, B | Implemented | `10-PERSONAL-EXPENSES.md` |
-| 6.14 | Running balance (cashbook) | P0 | W, A, B | Implemented | `10-PERSONAL-EXPENSES.md` |
+| 6.14 | Running balance (personal) | P0 | W, A, B | Implemented | `10-PERSONAL-EXPENSES.md` |
+
+> **Note**: Feature 2.14 (Starting money pool) was removed. Groups in TripBook do NOT have a shared cash pool. Members track their own payments and the app calculates who owes whom. This is the Split Karo/Splitwise model, not a CashBook model.
 
 ---
 

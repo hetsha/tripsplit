@@ -1,4 +1,8 @@
-# TripBook REST API Documentation
+# TripBook REST API Documentation (LEGACY)
+
+> **⚠️ DEPRECATED**: This document is a legacy API reference from the original implementation. It is preserved for reference during migration only. The canonical API specification is in `21-API-SPECIFICATION.md`. Do not follow this document for new development — it contains obsolete product concepts (CashBook, starting money, shared cash pool) that are no longer part of the product.
+
+---
 
 This document specifies the REST API contract for communicating with the TripBook PHP backend.
 
@@ -165,18 +169,6 @@ Fetches active shared pool money, payment method cash breakdowns, balances, sett
     "success": true,
     "message": "Dashboard data",
     "data": {
-      "trip_money": {
-        "starting_money": 8000.00,
-        "total_added_money": 0.00,
-        "total_spent": 900.00,
-        "available_shared_money": 7100.00,
-        "payment_breakdown": {
-          "cash": 7100.00,
-          "upi": 0.00,
-          "card": 0.00,
-          "bank": 0.00
-        }
-      },
       "expense_summary": {
         "total_all_expenses": 900.00,
         "expense_count": 1

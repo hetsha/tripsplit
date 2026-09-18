@@ -33,7 +33,7 @@ stateDiagram-v2
 | Group name required | Yes, 1-150 characters |
 | Description | Optional, max 500 characters |
 | Currency | Default INR, configurable per group |
-| Starting money | Optional, defaults to 0 |
+| Starting money | **Removed** — Groups do not have a shared cash pool |
 
 ### Database: `trips` Table
 
@@ -44,7 +44,7 @@ stateDiagram-v2
 | url_token | VARCHAR(8) | Yes | generated | URL-friendly token |
 | name | VARCHAR(150) | No | — | Group name |
 | description | TEXT | Yes | NULL | Group description |
-| starting_money | DECIMAL(12,2) | No | 0.00 | Initial cash pool |
+| starting_money | DECIMAL(12,2) | No | 0.00 | **Legacy field** — not used in current product. See note below. |
 | starting_payer_id | INT UNSIGNED FK | Yes | NULL | Who contributed starting money |
 | starting_payment_method | ENUM | No | 'cash' | Payment method for starting money |
 | currency | VARCHAR(10) | No | 'INR' | Currency code |
@@ -79,7 +79,7 @@ stateDiagram-v2
 |-------|------|-------|
 | name | Required, 1-150 chars | "Group name is required" |
 | description | Max 500 chars | "Description too long" |
-| starting_money | ≥ 0, max 2 decimals | "Invalid starting amount" |
+| starting_money | **Deprecated** — field exists in DB but is not used in current product |
 | currency | Valid ISO 4217 code | "Invalid currency" |
 
 ---
@@ -92,8 +92,8 @@ stateDiagram-v2
 |-------|-------------|
 | name | Owner, Admin |
 | description | Owner, Admin |
-| starting_money | Owner only |
-| starting_payment_method | Owner only |
+| starting_money | **Deprecated** — not editable in current product |
+| starting_payment_method | **Deprecated** — not editable in current product |
 | currency | Owner only |
 
 ### API Endpoints
@@ -273,27 +273,13 @@ User opens URL with token (e.g., /group/a1b2c3d4)
 
 ---
 
-## 7. Starting Money Pool
+## 7. Starting Money Pool (REMOVED)
 
-### Purpose
-
-The starting money pool represents cash that was collected before the trip/group started. It is tracked separately from expenses.
-
-### Rules
-
-| Rule | Value |
-|------|-------|
-| Who sets | Creator during group creation (optional) |
-| Payer | Creator (or specified user) |
-| Payment method | Cash, UPI, Card, Bank |
-| Effect on balances | Starting payer's balance is adjusted |
-| Effect on cash pool | Added to available shared money |
-
-### Balance Impact
-
-When starting money = ₹8,000 paid by User A:
-- User A's `total_paid` increases by ₹8,000
-- Available shared money = Starting money + Added money - Total spent
+> **This section describes a legacy product concept that is NO LONGER part of TripBook.**
+>
+> Groups in TripBook do NOT have a shared cash pool. Members track their own payments and the app calculates who owes whom. This is the Split Karo/Splitwise model.
+>
+> The `starting_money` field exists in the `trips` database table for backward compatibility but is not used in the current product. It must not be presented as a feature.
 
 ---
 
