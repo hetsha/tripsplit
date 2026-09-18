@@ -1,0 +1,142 @@
+/* ==========================================================================
+   TripBook - Mobile Breakpoints & Responsive Enhancements
+   Targeting: 360px, 375px, 390px, 412px, 430px, Tablet & Desktop (768px, 1024px, 1280px+)
+   ========================================================================== */
+
+/* Ultra-compact mobile screens (<= 360px) */
+@media (max-width: 360px) {
+  .hero-amount {
+    font-size: 32px;
+  }
+  .hero-stats-row {
+    gap: 6px;
+  }
+  .hero-stat-val {
+    font-size: 13px;
+  }
+  .method-pill {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .nav-item {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+  .nav-item i, .nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+  .quick-actions-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Tablet Screens (>= 768px) and Desktop */
+@media (min-width: 768px) {
+  /* Modals shift to centered dialog cards on larger viewports */
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .bottom-sheet {
+    max-width: 520px;
+    border-radius: var(--radius-lg);
+    animation: zoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 85vh;
+  }
+
+  .sheet-handle {
+    display: none; /* Hide sheet handle on desktop modal */
+  }
+
+  @keyframes zoomIn {
+    from { transform: scale(0.96); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+}
+
+/* Desktop Screens (>= 1024px) */
+@media (min-width: 1024px) {
+  .app-container {
+    max-width: 1440px;
+  }
+
+  /* Show Left Sidebar */
+  .app-sidebar {
+    display: flex;
+  }
+
+  /* Hide Mobile Header back triggers, bottom nav, and mobile theme toggle */
+  .btn-back-trips,
+  .mobile-theme-btn {
+    display: none !important;
+  }
+  .bottom-nav {
+    display: none !important;
+  }
+
+  /* Adjust Main Content view margins */
+  .app-content {
+    padding: 32px 40px 40px 40px;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* Reposition FAB on desktop */
+  .fab-container {
+    bottom: 32px;
+    right: 40px;
+  }
+
+  /* Home Dashboard Multi-Column Grid Layout */
+  #tab-content {
+    display: grid !important;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px !important;
+    align-items: start;
+  }
+
+  #dashboard-hero-money {
+    grid-column: 1 / 2;
+  }
+
+  .quick-actions-row {
+    grid-column: 1 / 2;
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  #dashboard-category-spending {
+    grid-column: 1 / 2;
+  }
+
+  #dashboard-settlements {
+    grid-column: 2 / 3;
+    grid-row: 1 / 3;
+    align-self: stretch;
+  }
+
+  #dashboard-member-balances {
+    grid-column: 2 / 3;
+  }
+
+  #dashboard-recent-transactions {
+    grid-column: 1 / 3;
+  }
+
+  /* History list desktop structure */
+  .tx-list-desktop-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1.5px solid var(--border);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
