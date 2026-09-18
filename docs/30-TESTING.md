@@ -52,7 +52,7 @@ This document specifies the testing strategy: unit, integration, API, frontend, 
 | `trips.php` | POST | CRUD, join, permissions |
 | `expenses.php` | POST | Create, update, delete, F1 validation |
 | `settlements.php` | POST | Record, undo, F3 verification |
-| `cashbook.php` | POST | Personal expense/income |
+| `cashbook.php` | POST | Personal expense/income (LEGACY — tests will migrate to personal-finance.php) |
 
 ### Frontend Tests
 

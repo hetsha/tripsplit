@@ -225,7 +225,7 @@ These invariants are non-negotiable. They are enforced by the backend and must b
 |---|-----------|---------|-------------|
 | F1 | Expense total equals sum of participant shares | `expense_total = Σ(share_amount)` | `07-EXPENSES.md`, `08-SPLIT-METHODS.md` |
 | F2 | Settlement equals actual recorded transfer | `settlement.amount = real_world_payment` | `09-SETTLEMENTS.md` |
-| F3 | Group balance follows the canonical formula | `balance = paid - responsible - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
+| F3 | Group balance follows the canonical formula | `balance = total_paid - total_share - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
 | F4 | All financial operations are idempotent | `client_request_id` checked before insert | `21-API-SPECIFICATION.md` |
 | F5 | Backend is single source of truth | Clients display; backend computes | All financial docs |
 
@@ -285,7 +285,7 @@ The current codebase uses different terminology than the product specification. 
 | Group Member | `trip_members` | `api/members.php` |
 | Group Expense | `transactions` (type=expense) | `api/expenses.php`, `api/transactions.php` |
 | Settlement | `settlements` | `api/settlements.php` |
-| Personal Expense | `transactions` (trip_id=NULL) | `api/cashbook.php` |
+| Personal Expense | `transactions` (trip_id=NULL) | `api/cashbook.php` (LEGACY → `api/personal-finance.php`) |
 | Category | `categories` | `api/categories.php` |
 
 The existing database schema (`sql/schema.sql`) contains 13 tables. The full specification in `20-DATABASE-SCHEMA.md` will expand this to cover all new modules.

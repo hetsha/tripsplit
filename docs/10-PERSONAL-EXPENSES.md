@@ -58,7 +58,7 @@ Key: `trip_id = NULL` distinguishes personal from group expenses.
 
 | Endpoint | Method | Action |
 |----------|--------|--------|
-| `api/cashbook.php` | POST | Add personal expense/income |
+| `api/cashbook.php` | POST | Add personal expense/income (**LEGACY** — will be replaced by `api/personal-finance.php`) |
 | `api/expenses.php` | POST (is_personal=true) | Add personal expense |
 
 ---
@@ -302,7 +302,7 @@ Sorted by total amount descending. Shows top 5 or all if fewer.
 
 | Endpoint | Method | Action |
 |----------|--------|--------|
-| `api/cashbook.php` | GET | List personal transactions with filters |
+| `api/cashbook.php` | GET | List personal transactions with filters (**LEGACY** — will be replaced by `api/personal-finance.php`) |
 | `api/transactions.php` | GET (trip_id=NULL) | List personal transactions |
 
 ---
@@ -370,7 +370,7 @@ Track the user's cash flow across all personal financial activities.
 
 | Endpoint | Method | Action |
 |----------|--------|--------|
-| `api/cashbook.php` | GET | Get full cashbook ledger |
+| `api/cashbook.php` | GET | Get full cashbook ledger (**LEGACY** — will be replaced by `api/personal-finance.php`) |
 | `api/passbook.php` | GET | Get bank-style passbook view |
 
 ---

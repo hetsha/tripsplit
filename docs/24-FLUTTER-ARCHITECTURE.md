@@ -40,7 +40,7 @@ tripbook_flutter/
 │   │   │   └── add_expense_screen.dart
 │   │   ├── groups/
 │   │   │   └── groups_list_screen.dart
-│   │   ├── cashbook/
+│   │   ├── cashbook/            # LEGACY — will be replaced by personal_finance/
 │   │   │   └── cashbook_screen.dart
 │   │   ├── passbook/
 │   │   │   └── passbook_screen.dart

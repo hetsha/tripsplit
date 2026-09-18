@@ -90,8 +90,8 @@ The current implementation has 13 tables. The specification below expands to cov
 | name | VARCHAR(150) | No | — | — | Group name |
 | description | TEXT | Yes | NULL | — | Description |
 | starting_money | DECIMAL(12,2) | No | 0.00 | — | **Legacy field** — not used in current product. Groups do not have a shared cash pool. |
-| starting_payer_id | INT UNSIGNED FK | Yes | NULL | — | Starting money contributor |
-| starting_payment_method | ENUM('cash','upi','card','bank','other') | No | 'cash' | — | Starting payment method |
+| starting_payer_id | INT UNSIGNED FK | Yes | NULL | — | **LEGACY** — Starting money contributor. Not used in current product. |
+| starting_payment_method | ENUM('cash','upi','card','bank','other') | No | 'cash' | — | **LEGACY** — Starting payment method. Not used in current product. |
 | currency | VARCHAR(10) | No | 'INR' | — | Currency code |
 | currency_symbol | VARCHAR(5) | No | '₹' | — | Currency symbol |
 | group_type | ENUM('trip','flat','event','custom') | No | 'trip' | — | Group type |

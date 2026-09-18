@@ -40,7 +40,7 @@ tripsplit/
 │       ├── auth-email.js     # Email OTP
 │       ├── dashboard.js      # Dashboard logic
 │       ├── expenses.js       # Expense creation
-│       ├── cashbook.js       # Personal finance
+│       ├── cashbook.js       # Personal finance (LEGACY — will be replaced)
 │       ├── passbook.js       # Passbook view
 │       ├── settlements.js    # Settlement logic
 │       ├── transactions.js   # Transaction list

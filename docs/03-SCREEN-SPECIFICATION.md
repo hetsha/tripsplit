@@ -588,7 +588,7 @@ Each screen entry follows this template:
 
 **Purpose**: Overview of personal finances.
 **Entry Points**: Tab or navigation from main dashboard.
-**API Calls**: `GET api/cashbook.php`.
+**API Calls**: `GET api/cashbook.php` (LEGACY — will be replaced by personal finance API).
 
 **UI Sections**:
 1. **Balance Card**: Total balance (income - expenses)
@@ -646,7 +646,7 @@ Each screen entry follows this template:
 
 **Purpose**: Complete personal transaction history.
 **Entry Points**: Personal Dashboard → "View All".
-**API Calls**: `GET api/cashbook.php`.
+**API Calls**: `GET api/cashbook.php` (LEGACY — will be replaced by personal finance API).
 
 **UI Sections**:
 1. **Running Balance Header**: Total in, total out, net

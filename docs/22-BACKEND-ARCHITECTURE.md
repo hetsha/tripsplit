@@ -38,7 +38,7 @@ tripsplit/
 │   ├── transactions.php      # Transaction list/delete
 │   ├── settlements.php       # Settlement operations
 │   ├── dashboard.php         # Dashboard data
-│   ├── cashbook.php          # Personal finance
+│   ├── cashbook.php          # Personal finance (LEGACY — will be replaced by personal-finance.php)
 │   ├── passbook.php          # Passbook view
 │   ├── categories.php        # Category management
 │   ├── notifications.php     # Notifications

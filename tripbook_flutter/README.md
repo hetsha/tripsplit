@@ -1,6 +1,6 @@
 # TripBook Android Application (Flutter)
 
-A premium travel-finance Android application for TripBook built with Flutter, Material 3, and Provider.
+A premium shared-expense and personal-finance Android application for TripBook built with Flutter, Material 3, and Provider.
 
 ---
 
@@ -113,7 +113,7 @@ The outputs will be generated under:
 
 ## Real-Time Synchronization & Offline Awareness
 
-- **Interval Sync**: Polling `/api/sync.php` every 8 seconds checks the version hash.
+- **Interval Sync**: Polling `/api/sync.php` every 6 seconds checks the version hash.
 - **Auto-Pause**: If the app transitions to the background or if network connectivity drops, aggressive polling is paused automatically.
 - **Offline Banner**: An alert banner will overlay at the top of the interface notifying the user when they are viewing offline cached ledgers.
 

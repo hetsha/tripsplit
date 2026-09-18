@@ -1,5 +1,7 @@
 # 25 Aug Next Plan — TripBook/SplitBook
 
+> **⚠️ HISTORICAL DOCUMENT**: This file is a historical planning note from August 25. It documents a specific feature planning session and does not represent the current product definition. The canonical product specification lives in `docs/00-PROJECT-OVERVIEW.md` and related documentation in `docs/`. Some planned features described here (e.g., CashBook, starting money) are no longer part of the product. This file is preserved for reference only.
+
 ## Full Implementation Plan
 
 ---

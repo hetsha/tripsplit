@@ -56,7 +56,7 @@ A mobile-first shared expense management and personal finance tracking web appli
 
 ## Tech Stack
 
-- **Backend**: PHP 8+, MySQL 5.7+ / 8.0+
+- **Backend**: PHP 8+, MySQL 8+
 - **Frontend**: Vanilla JavaScript (ES6+), CSS3
 - **PWA**: Service Worker for offline static asset caching
 - **Icons**: Lucide Icons

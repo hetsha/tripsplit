@@ -1,8 +1,8 @@
-# Implementation Plan - TripBook
+# Implementation Plan - TripBook (HISTORICAL — DO NOT FOLLOW)
+
+> **⚠️ DEPRECATED**: This plan was written for the old "CashBook + Splitwise" product concept and does not reflect the current product definition. The canonical product specification is in `docs/00-PROJECT-OVERVIEW.md`. `starting_money` / CashBook concepts have been removed from the product. This file is preserved for historical reference only. Do not use it for implementation guidance.
 
 TripBook is a mobile-first financial management web application combining **shared expense management** (Split Karo/Splitwise-style expense splitting, balance calculation, and smart debt settlement) with **personal expense and income tracking** for individuals and groups.
-
-> **Note**: This plan was originally written for the old "CashBook + Splitwise" product concept. The current product direction is a Split Karo-style expense sharing app + personal finance tracker. The `starting_money` / CashBook concepts have been removed from the product. This plan is preserved for reference but the product definition has changed.
 
 ## Key Principles & Design Decisions
 

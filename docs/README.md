@@ -128,7 +128,7 @@ These invariants are enforced by the backend and documented across multiple file
 |---|-----------|-------------|
 | F1 | `expense_total = Σ(participant_shares)` | `07-EXPENSES.md`, `08-SPLIT-METHODS.md`, `20-DATABASE-SCHEMA.md` |
 | F2 | `settlement = actual recorded transfer` | `09-SETTLEMENTS.md` |
-| F3 | `group_balance = paid - responsible - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
+| F3 | `group_balance = total_paid - total_share - settlements_received + settlements_sent` | `09-SETTLEMENTS.md`, `12-ANALYTICS.md` |
 | F4 | All financial operations are idempotent via `client_request_id` | `21-API-SPECIFICATION.md` |
 | F5 | Backend is the single source of truth for all financial calculations | All financial docs |
 
