@@ -1,0 +1,100 @@
+# ============================================
+# TripBook - Git Ignore Rules
+# ============================================
+
+# -------------------------------------------
+# SECRETS & CREDENTIALS (NEVER COMMIT)
+# -------------------------------------------
+client_secret_*.json
+*client_secret*.json
+service-account*.json
+*.p12
+*.pem
+*.key
+*.keystore
+key.properties
+google-services.json
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.production
+
+# -------------------------------------------
+# PHP
+# -------------------------------------------
+/vendor/
+composer.lock
+*.log
+error_log
+
+# -------------------------------------------
+# DATABASE DUMPS (may contain production data)
+# -------------------------------------------
+sql/dumps/
+sql/*.sql.bak
+*.sql.gz
+
+# -------------------------------------------
+# STORAGE (user uploads, receipts, exports)
+# -------------------------------------------
+storage/receipts/
+storage/exports/
+storage/whatsapp_media/
+storage/cache/
+storage/logs/
+
+# -------------------------------------------
+# IDE & EDITOR
+# -------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# -------------------------------------------
+# NODE (if any build tools added later)
+# -------------------------------------------
+node_modules/
+npm-debug.log
+
+# -------------------------------------------
+# FLUTTER
+# -------------------------------------------
+tripbook_flutter/.dart_tool/
+tripbook_flutter/.packages
+tripbook_flutter/build/
+tripbook_flutter/.flutter-plugins
+tripbook_flutter/.flutter-plugins-dependencies
+tripbook_flutter/pubspec.lock
+tripbook_flutter/android/.gradle/
+tripbook_flutter/android/app/build/
+tripbook_flutter/android/local.properties
+tripbook_flutter/android/key.properties
+tripbook_flutter/ios/
+tripbook_flutter/web/
+tripbook_flutter/.metadata
+
+# -------------------------------------------
+# OS FILES
+# -------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# -------------------------------------------
+# TEMP & CACHE
+# -------------------------------------------
+tmp/
+cache/
+*.tmp
+*.cache
