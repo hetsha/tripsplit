@@ -88,7 +88,7 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         error: AppColors.negative,
       ),
-      cardTheme: const CardThemeData(
+      cardTheme: const CardTheme(
         color: AppColors.surfaceLight,
         elevation: 0,
       ),
@@ -112,7 +112,7 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         error: AppColors.negative,
       ),
-      cardTheme: const CardThemeData(
+      cardTheme: const CardTheme(
         color: AppColors.elevatedDark,
         elevation: 0,
       ),
