@@ -2,42 +2,71 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // --- Primary & Brand ---
-  static const Color primary = Color(0xFF5B5CFF);
-  static const Color primaryRGB = Color(0xFF5B5CFF);
-  static const List<Color> brandGradient = [Color(0xFF5B5CFF), Color(0xFF8B5CF6), Color(0xFFD946EF)];
-  static const List<Color> brandGradient2 = [Color(0xFF5B5CFF), Color(0xFF8B5CF6)];
-
-  // --- Accent / Additional ---
-  static const List<Color> accentGradient = [Color(0xFF8B5CF6), Color(0xFFD946EF)];
+  // --- TripSplit Brand & Royal Purple Gradients ---
+  static const Color primary = Color(0xFF6C38FF);
+  static const Color primaryRGB = Color(0xFF6C38FF);
+  static const Color primaryDark = Color(0xFF5B2DE8);
   static const Color secondary = Color(0xFF8B5CF6);
-  static const Color accent = Color(0xFFD946EF);
+  static const Color accent = Color(0xFFA855F7);
+  static const Color brandLavender = Color(0xFFF3E8FF);
+  static const Color brandLavenderLight = Color(0xFFF8F5FE);
 
-  // --- Quick Action Gradients ---
-  static const List<Color> expenseGradient = [Color(0xFF5B5CFF), Color(0xFF7C3AED)];
-  static const List<Color> poolGradient = [Color(0xFF10B981), Color(0xFF059669)];
-  static const List<Color> settleGradient = [Color(0xFFF59E0B), Color(0xFFF97316)];
-  static const List<Color> statsGradient = [Color(0xFF06B6D4), Color(0xFF3B82F6)];
+  // Gradient for primary buttons and banners
+  static const List<Color> brandGradient = [
+    Color(0xFF5B3EE8),
+    Color(0xFF7A42F3),
+    Color(0xFF8E3CF8),
+  ];
+  static const List<Color> brandGradient2 = [
+    Color(0xFF5B3EE8),
+    Color(0xFF7E42F5),
+  ];
+  static const List<Color> accentGradient = [Color(0xFF8B5CF6), Color(0xFFD946EF)];
+  static const List<Color> splashGradient = [
+    Color(0xFF070926),
+    Color(0xFF0F1138),
+    Color(0xFF1D1248),
+  ];
 
   // --- Status Colors ---
   static const Color positive = Color(0xFF10B981);
-  static const Color positiveLight = Color(0xFF10B981); // rgba(16,185,129,0.1) approx
-  static const Color positiveDark = Color(0xFF34D399); // web: #34d399
-  static const Color negative = Color(0xFFF43F5E);
-  static const Color negativeLight = Color(0xFFF43F5E);
-  static const Color negativeDark = Color(0xFFE25252); // web: #fca5a5 approx
+  static const Color positiveLight = Color(0xFF10B981);
+  static const Color positiveDark = Color(0xFF34D399);
+  static const Color positiveBg = Color(0xFFECFDF5);
+  static const Color positiveText = Color(0xFF059669);
+
+  static const Color negative = Color(0xFFEF4444);
+  static const Color negativeLight = Color(0xFFEF4444);
+  static const Color negativeDark = Color(0xFFE25252);
+  static const Color negativeBg = Color(0xFFFEF2F2);
+  static const Color negativeText = Color(0xFFDC2626);
+
   static const Color warning = Color(0xFFF59E0B);
-  static const Color warningLight = Color(0xFFF59E0B); // rgba(245,158,11,0.1) approx
-  static const Color warningDark = Color(0xFFFDE047); // web: #fde047
-  static const Color info = Color(0xFF06B6D4);
-  static const Color infoLight = Color(0xFF06B6D4); // rgba(6,182,212,0.1) approx
+  static const Color warningLight = Color(0xFFF59E0B);
+  static const Color warningDark = Color(0xFFFDE047);
+  static const Color warningBg = Color(0xFFFFFBEB);
+  static const Color warningText = Color(0xFFD97706);
+
+  static const Color info = Color(0xFF3B82F6);
+  static const Color infoLight = Color(0xFF06B6D4);
+  static const Color infoBg = Color(0xFFEFF6FF);
+  static const Color infoText = Color(0xFF2563EB);
+
+  // --- Quick Action Gradients ---
+  static const List<Color> expenseGradient = [Color(0xFF6C38FF), Color(0xFF8B5CF6)];
+  static const List<Color> membersGradient = [Color(0xFF3B82F6), Color(0xFF60A5FA)];
+  static const List<Color> settleGradient = [Color(0xFFEC4899), Color(0xFFF43F5E)];
+  static const List<Color> galleryGradient = [Color(0xFF10B981), Color(0xFF34D399)];
+  static const List<Color> poolGradient = [Color(0xFF10B981), Color(0xFF059669)];
+  static const List<Color> statsGradient = [Color(0xFF06B6D4), Color(0xFF3B82F6)];
 
   // --- Light Theme Colors ---
-  static const Color bgLight = Color(0xFFF5F7FB);
+  static const Color bgLight = Color(0xFFF8F9FE);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color textLightMain = Color(0xFF0F172A);
+  static const Color textLightMain = Color(0xFF1E1B4B);
   static const Color textLightMuted = Color(0xFF64748B);
-  static const Color borderLight = Color(0xFFE2E8F0);
+  static const Color borderLight = Color(0xFFEBE8F8);
+  static const Color inputBgLight = Color(0xFFF8FAFC);
 
   // --- Dark Theme Colors ---
   static const Color bgDark = Color(0xFF070A12);
@@ -45,31 +74,31 @@ class AppColors {
   static const Color elevatedDark = Color(0xFF101729);
   static const Color textDarkMain = Color(0xFFF8FAFC);
   static const Color textDarkMuted = Color(0xFF94A3B8);
-  static const Color borderDark = Color(0x14FFFFFF); // rgba(255,255,255,0.08)
+  static const Color borderDark = Color(0x14FFFFFF);
 
   // --- Glassmorphism ---
-  static const Color glassBgLight = Color(0xFF0F172A); // rgba(15,23,42,0.85) approx
-  static const Color glassBgDark = Color(0xFF0B1020); // rgba(11,16,32,0.7) approx
-  static const double glassBlurSigma = 24.0; // web: var(--glass-blur) = blur(24px)
+  static const Color glassBgLight = Color(0xFF0F172A);
+  static const Color glassBgDark = Color(0xFF0B1020);
+  static const double glassBlurSigma = 16.0;
 
   // --- Shadows ---
-  static const Color shadowSm = Color(0x33000000); // 0 1px 2px 0 rgba(0,0,0,0.3)
-  static const Color shadowMd = Color(0x7A000000); // 0 4px 20px -2px rgba(0,0,0,0.5) + 0 2px 6px -2px rgba(0,0,0,0.3)
-  static const Color shadowLg = Color(0xAA000000); // 0 10px 30px -4px rgba(0,0,0,0.7) + 0 4px 10px -4px rgba(0,0,0,0.4)
-  static const Color shadowSheet = Color(0xA0000000); // 0 -10px 40px -5px rgba(0,0,0,0.6) - bottom nav shadow
+  static const Color shadowSm = Color(0x33000000);
+  static const Color shadowMd = Color(0x7A000000);
+  static const Color shadowLg = Color(0xAA000000);
+  static const Color shadowSheet = Color(0xA0000000);
 
   // --- Borders ---
-  static const Color borderPrimary = Color(0xFF5B5CFF); // --border-focus
-  static const Color borderSubtle = Color(0x0A000000); // rgba(255,255,255,0.04) approx
+  static const Color borderPrimary = Color(0xFF6C38FF);
+  static const Color borderSubtle = Color(0x0A000000);
 
   // --- Text Colors ---
-  static const Color textPrimaryLight = Color(0xFF0F172A); // --text-main light
-  static const Color textPrimaryDark = Color(0xFFF8FAFC); // --text-main dark
-  static const Color textSecondaryLight = Color(0xFF64748B); // --text-muted light
-  static const Color textSecondaryDark = Color(0xFF94A3B8); // --text-muted dark
-  static const Color textInverse = Color(0xFF070A12); // --text-inverse dark
+  static const Color textPrimaryLight = Color(0xFF1E1B4B);
+  static const Color textPrimaryDark = Color(0xFFF8FAFC);
+  static const Color textSecondaryLight = Color(0xFF64748B);
+  static const Color textSecondaryDark = Color(0xFF94A3B8);
+  static const Color textInverse = Color(0xFF070A12);
   static const Color textLight = Color(0xFF64748B);
-  static const Color textMainLight = Color(0xFF0F172A);
+  static const Color textMainLight = Color(0xFF1E1B4B);
   static const Color textMainDark = Color(0xFFF8FAFC);
   static const Color textMutedLight = Color(0xFF64748B);
   static const Color textMutedDark = Color(0xFF94A3B8);
@@ -88,14 +117,45 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         error: AppColors.negative,
       ),
-      cardTheme: const CardTheme(
+      fontFamily: 'Roboto',
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: AppColors.textLightMain),
+        titleTextStyle: TextStyle(
+          color: AppColors.textLightMain,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardTheme(
         color: AppColors.surfaceLight,
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.borderLight, width: 1),
+        ),
       ),
       textTheme: const TextTheme(
-        titleLarge: TextStyle(color: AppColors.textLightMain, fontWeight: FontWeight.bold, fontSize: 20),
-        bodyLarge: TextStyle(color: AppColors.textLightMain, fontSize: 16),
-        bodyMedium: TextStyle(color: AppColors.textLightMuted, fontSize: 14),
+        titleLarge: TextStyle(
+          color: AppColors.textLightMain,
+          fontWeight: FontWeight.w700,
+          fontSize: 22,
+        ),
+        titleMedium: TextStyle(
+          color: AppColors.textLightMain,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+        bodyLarge: TextStyle(
+          color: AppColors.textLightMain,
+          fontSize: 15,
+        ),
+        bodyMedium: TextStyle(
+          color: AppColors.textLightMuted,
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -112,20 +172,51 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         error: AppColors.negative,
       ),
-      cardTheme: const CardTheme(
+      fontFamily: 'Roboto',
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: AppColors.textDarkMain),
+        titleTextStyle: TextStyle(
+          color: AppColors.textDarkMain,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardTheme(
         color: AppColors.elevatedDark,
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.borderDark, width: 1),
+        ),
       ),
       textTheme: const TextTheme(
-        titleLarge: TextStyle(color: AppColors.textDarkMain, fontWeight: FontWeight.bold, fontSize: 20),
-        bodyLarge: TextStyle(color: AppColors.textDarkMain, fontSize: 16),
-        bodyMedium: TextStyle(color: AppColors.textDarkMuted, fontSize: 14),
+        titleLarge: TextStyle(
+          color: AppColors.textDarkMain,
+          fontWeight: FontWeight.w700,
+          fontSize: 22,
+        ),
+        titleMedium: TextStyle(
+          color: AppColors.textDarkMain,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+        bodyLarge: TextStyle(
+          color: AppColors.textDarkMain,
+          fontSize: 15,
+        ),
+        bodyMedium: TextStyle(
+          color: AppColors.textDarkMuted,
+          fontSize: 13,
+        ),
       ),
     );
   }
 }
 
-// Glassmorphic Card Container Widget - Matching web card styles
+// Glassmorphic Card Container Widget
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -137,7 +228,7 @@ class GlassCard extends StatelessWidget {
     Key? key,
     required this.child,
     this.padding,
-    this.borderRadius = 24.0, // web: --radius-lg = 24px
+    this.borderRadius = 24.0,
     this.borderGradients,
     this.bgColor,
   }) : super(key: key);
@@ -161,23 +252,6 @@ class GlassCard extends StatelessWidget {
                   : Colors.black.withOpacity(0.05),
               width: 1.0,
             ),
-            boxShadow: isDark
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.08),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
           ),
           child: child,
         ),

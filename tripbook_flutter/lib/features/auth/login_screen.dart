@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/tripsplit_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -102,6 +103,12 @@ class _LoginScreenState extends State<LoginScreen> {
         final email = _emailController.text.trim();
         await authService.verifyEmailOtp(email, otp);
       }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login successful! Welcome to TripSplit.'), backgroundColor: AppColors.positive),
+        );
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString()), backgroundColor: AppColors.negative),
@@ -131,6 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       await Provider.of<AuthService>(context, listen: false).loginWithGoogle(credential);
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -157,40 +167,82 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo Icon and App Title
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: AppColors.brandGradient,
-                  ).createShader(bounds),
-                  child: const Icon(
-                    Icons.explore_rounded,
-                    size: 72,
-                    color: Colors.white,
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Top navigation row: Back button & Screens switcher
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                        onPressed: () {
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            Navigator.of(context).pushReplacementNamed('/home');
+                          }
+                        },
+                      ),
+                      GestureDetector(
+                        onTap: () => TripSplitScreenNavigator.show(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.dashboard_customize_rounded, size: 14, color: AppColors.primary),
+                              SizedBox(width: 6),
+                              Text(
+                                'All Screens',
+                                style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'TripBook',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                    letterSpacing: -0.8,
+                  const SizedBox(height: 20),
+
+                  // Logo Icon and App Title
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: AppColors.brandGradient,
+                    ).createShader(bounds),
+                    child: const Icon(
+                      Icons.flight_takeoff_rounded,
+                      size: 68,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                Text(
-                  'Premium Group Finance',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                  const SizedBox(height: 10),
+                  Text(
+                    'TripSplit',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                      letterSpacing: -0.8,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 36),
+                  Text(
+                    'Split Expenses • Share Memories',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
 
                 // Main Onboarding Login Card
                 GlassCard(
@@ -356,6 +408,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        // Quick Demo Bypass Button
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pushReplacementNamed('/home');
+                          },
+                          icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                          label: const Text(
+                            'Continue to Home (Demo Mode)',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -365,8 +429,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTabButton(String text, bool isActive, VoidCallback onPressed) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
