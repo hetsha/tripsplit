@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tripsplit_widgets.dart';
+import '../../services/auth_service.dart';
+import '../../services/expense_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({Key? key}) : super(key: key);
@@ -10,65 +13,149 @@ class AddExpenseScreen extends StatefulWidget {
 }
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
-  final _titleController = TextEditingController(text: 'Dinner at Beach Shack');
-  final _amountController = TextEditingController(text: '2,450');
-  final _noteController = TextEditingController(text: 'Dinner with the group at beach shack. Great food! 🍲');
+  final _titleController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _noteController = TextEditingController();
 
-  String _selectedCategory = 'Food & Drinks';
-  DateTime _expenseDate = DateTime(2024, 12, 12);
-  String _paidBy = 'You (Het)';
+  int? _selectedCategoryId;
+  String _selectedCategoryName = 'Food & Dining';
+  DateTime _expenseDate = DateTime.now();
+  int? _paidByUserId;
+  String _paidByName = 'You';
   bool _splitEqually = true;
+  String _selectedPaymentMethod = 'upi'; // 'upi', 'cash', 'card', 'bank'
+  bool _isSaving = false;
+
+  Map<String, dynamic>? _selectedTrip;
+  List<Map<String, dynamic>> _activeTrips = [];
+  bool _initialized = false;
 
   // Members for the current trip split
-  final List<Map<String, dynamic>> _tripMembers = [
-    {
-      'name': 'You (Het)',
-      'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      'included': true,
-      'amount': 490.0,
-    },
-    {
-      'name': 'Priya S.',
-      'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      'included': true,
-      'amount': 490.0,
-    },
-    {
-      'name': 'Rahul V.',
-      'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100',
-      'included': true,
-      'amount': 490.0,
-    },
-    {
-      'name': 'Sneha K.',
-      'avatar': 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      'included': true,
-      'amount': 490.0,
-    },
-    {
-      'name': 'Amit M.',
-      'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-      'included': true,
-      'amount': 490.0,
-    },
+  List<Map<String, dynamic>> _tripMembers = [];
+
+  final List<Map<String, String>> _paymentMethods = [
+    {'id': 'upi', 'label': 'UPI / GPay', 'icon': '⚡'},
+    {'id': 'cash', 'label': 'Cash', 'icon': '💵'},
+    {'id': 'card', 'label': 'Card', 'icon': '💳'},
+    {'id': 'bank', 'label': 'Bank Transfer', 'icon': '🏦'},
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final expense = Provider.of<ExpenseService>(context, listen: false);
+
+      // Load trips
+      if (auth.detailedTrips.isNotEmpty) {
+        _activeTrips = auth.detailedTrips;
+      }
+
+      int? targetTripId = args?['tripId'] ?? args?['trip']?['id'] ?? auth.activeTripId;
+
+      if (_activeTrips.isNotEmpty) {
+        _selectedTrip = _activeTrips.firstWhere(
+          (t) => t['id'] == targetTripId,
+          orElse: () => _activeTrips.first,
+        );
+      }
+
+      // Load categories for active trip if not already loaded
+      expense.loadCategories(tripId: targetTripId).then((_) {
+        if (mounted && expense.categories.isNotEmpty) {
+          setState(() {
+            _selectedCategoryId = expense.categories.first['id'] as int?;
+            _selectedCategoryName = expense.categories.first['name'] as String? ?? 'Food & Dining';
+          });
+        }
+      });
+
+      _setupMembers();
+      _initialized = true;
+    }
+  }
+
+  void _setupMembers() {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final expense = Provider.of<ExpenseService>(context, listen: false);
+    final currentUser = auth.currentUser;
+
+    List<Map<String, dynamic>> rawMembers = [];
+
+    // Attempt 1: from _selectedTrip['members']
+    if (_selectedTrip != null && _selectedTrip!['members'] is List && (_selectedTrip!['members'] as List).isNotEmpty) {
+      rawMembers = List<Map<String, dynamic>>.from(_selectedTrip!['members']);
+    }
+    // Attempt 2: from expense.dashboardData['member_balances']
+    else if (expense.dashboardData?['member_balances'] is List && (expense.dashboardData!['member_balances'] as List).isNotEmpty) {
+      rawMembers = List<Map<String, dynamic>>.from(expense.dashboardData!['member_balances']);
+    }
+
+    if (rawMembers.isEmpty && currentUser != null) {
+      rawMembers = [
+        {
+          'id': currentUser.id,
+          'user_id': currentUser.id,
+          'name': currentUser.name,
+          'avatar_color': currentUser.avatarColor,
+        }
+      ];
+    }
+
+    _tripMembers = rawMembers.map((m) {
+      final uid = m['id'] ?? m['user_id'] ?? 0;
+      final isCurrent = currentUser != null && uid == currentUser.id;
+      final mName = isCurrent ? 'You (${m['name']})' : (m['name'] ?? 'Member');
+
+      return {
+        'user_id': uid,
+        'name': mName,
+        'avatar_color': m['avatar_color'] ?? '#3b82f6',
+        'included': true,
+        'amount': 0.0,
+      };
+    }).toList();
+
+    // Default payer
+    if (currentUser != null) {
+      _paidByUserId = currentUser.id;
+      _paidByName = 'You (${currentUser.name})';
+    } else if (_tripMembers.isNotEmpty) {
+      _paidByUserId = _tripMembers.first['user_id'] as int?;
+      _paidByName = _tripMembers.first['name'] as String? ?? 'Payer';
+    }
+
+    _recalculateEqualSplit();
+  }
 
   double _getExpenseTotal() {
     final clean = _amountController.text.replaceAll(',', '').replaceAll(' ', '');
-    return double.tryParse(clean) ?? 2450.0;
+    return double.tryParse(clean) ?? 0.0;
   }
 
   void _recalculateEqualSplit() {
     final total = _getExpenseTotal();
     final includedMembers = _tripMembers.where((m) => m['included'] == true).toList();
-    if (includedMembers.isNotEmpty) {
-      final perPerson = (total / includedMembers.length).roundToDouble();
-      for (final m in _tripMembers) {
-        if (m['included'] == true) {
-          m['amount'] = perPerson;
+    if (includedMembers.isNotEmpty && total > 0) {
+      final perPerson = total / includedMembers.length;
+      double accumulated = 0.0;
+
+      for (int i = 0; i < includedMembers.length; i++) {
+        if (i == includedMembers.length - 1) {
+          includedMembers[i]['amount'] = double.parse((total - accumulated).toStringAsFixed(2));
         } else {
-          m['amount'] = 0.0;
+          final rounded = double.parse(perPerson.toStringAsFixed(2));
+          includedMembers[i]['amount'] = rounded;
+          accumulated += rounded;
         }
+      }
+    }
+
+    for (final m in _tripMembers) {
+      if (m['included'] != true) {
+        m['amount'] = 0.0;
       }
     }
   }
@@ -83,50 +170,106 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     return sum;
   }
 
-  Map<String, dynamic>? _selectedTrip;
-  List<Map<String, dynamic>> _activeTrips = [];
-  bool _initializedFromArgs = false;
-
-  // Fallback active trips list (strictly active ongoing trips)
-  final List<Map<String, dynamic>> _fallbackActiveTrips = [
-    {
-      'id': 1,
-      'title': 'Goa Trip 🏖️',
-      'destination': 'Goa, India',
-      'dates': '12 - 16 Dec 2024',
-      'image': 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 5,
-    },
-    {
-      'id': 2,
-      'title': 'Manali Winter Trip 🏔️',
-      'destination': 'Manali, Himachal',
-      'dates': '5 - 10 Jan 2025',
-      'image': 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 4,
-    },
-    {
-      'id': 3,
-      'title': 'Weekend Roadtrip 🚗',
-      'destination': 'Lonavala & Khandala',
-      'dates': '22 - 24 Nov 2024',
-      'image': 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 3,
-    },
-  ];
-
-  final List<String> _categories = [
-    'Food & Drinks',
-    'Stay & Hotel',
-    'Transport',
-    'Activities',
-    'Shopping',
-    'Other'
-  ];
-
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Future<void> _handleSaveExpense(bool isPersonal) async {
+    final title = _titleController.text.trim();
+    final total = _getExpenseTotal();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an expense title')),
+      );
+      return;
+    }
+
+    if (total <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid amount greater than 0')),
+      );
+      return;
+    }
+
+    if (!isPersonal) {
+      final included = _tripMembers.where((m) => m['included'] == true).toList();
+      if (included.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please include at least one member in the split')),
+        );
+        return;
+      }
+
+      if (_splitEqually) {
+        _recalculateEqualSplit();
+      } else {
+        final allocated = _getCustomAllocatedTotal();
+        if ((total - allocated).abs() > 0.05) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Split amounts must equal total bill (₹ $total). Currently: ₹ $allocated')),
+          );
+          return;
+        }
+      }
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final expense = Provider.of<ExpenseService>(context, listen: false);
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final tripId = _selectedTrip?['id'] as int? ?? auth.activeTripId;
+
+      final splits = isPersonal
+          ? <Map<String, dynamic>>[]
+          : _tripMembers
+              .where((m) => m['included'] == true && (m['amount'] as double) > 0)
+              .map((m) => {
+                    'user_id': m['user_id'],
+                    'amount': m['amount'],
+                  })
+              .toList();
+
+      final categoryId = _selectedCategoryId ??
+          (expense.categories.isNotEmpty ? expense.categories.first['id'] as int : 1);
+
+      await expense.saveExpense(
+        amount: total,
+        description: title,
+        categoryId: categoryId,
+        paidBy: _paidByUserId ?? auth.currentUser?.id ?? 0,
+        paymentMethod: _selectedPaymentMethod,
+        isPersonal: isPersonal,
+        clientRequestId: DateTime.now().millisecondsSinceEpoch.toString(),
+        splits: splits,
+        tripId: tripId,
+        notes: _noteController.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isPersonal
+                ? 'Personal expense recorded to Cashbook!'
+                : 'Expense added to ${_selectedTrip?['title'] ?? 'trip'} successfully!'),
+            backgroundColor: AppColors.positive,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save expense: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -134,21 +277,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isPersonal = args?['isPersonal'] == true;
+    final expense = Provider.of<ExpenseService>(context);
 
-    if (!_initializedFromArgs) {
-      if (args?['activeTrips'] != null) {
-        _activeTrips = (args!['activeTrips'] as List).cast<Map<String, dynamic>>();
-      } else {
-        _activeTrips = _fallbackActiveTrips;
-      }
-
-      if (args?['trip'] != null) {
-        _selectedTrip = args!['trip'] as Map<String, dynamic>;
-      } else {
-        _selectedTrip = _activeTrips.isNotEmpty ? _activeTrips.first : null;
-      }
-      _initializedFromArgs = true;
-    }
+    final categoriesList = expense.categories.isNotEmpty
+        ? expense.categories
+        : [
+            {'id': 1, 'name': 'Food & Dining'},
+            {'id': 2, 'name': 'Transportation'},
+            {'id': 3, 'name': 'Accommodation'},
+            {'id': 4, 'name': 'Activities'},
+            {'id': 5, 'name': 'Shopping'},
+            {'id': 10, 'name': 'Other'},
+          ];
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
@@ -296,30 +436,30 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   ),
                                 ),
                                 child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedCategory,
+                                  child: DropdownButton<int>(
+                                    value: _selectedCategoryId ?? (categoriesList.isNotEmpty ? categoriesList.first['id'] as int : null),
                                     isExpanded: true,
                                     icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
-                                    items: _categories.map((c) {
-                                      return DropdownMenuItem(
-                                        value: c,
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.restaurant_rounded, size: 16, color: AppColors.primary),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                c,
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
+                                    items: categoriesList.map((c) {
+                                      final id = c['id'] as int;
+                                      final name = c['name'] as String? ?? 'Category';
+                                      return DropdownMenuItem<int>(
+                                        value: id,
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       );
                                     }).toList(),
                                     onChanged: (val) {
-                                      if (val != null) setState(() => _selectedCategory = val);
+                                      if (val != null) {
+                                        final matched = categoriesList.firstWhere((c) => c['id'] == val, orElse: () => categoriesList.first);
+                                        setState(() {
+                                          _selectedCategoryId = val;
+                                          _selectedCategoryName = matched['name'] as String? ?? 'Category';
+                                        });
+                                      }
                                     },
                                   ),
                                 ),
@@ -350,10 +490,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     firstDate: DateTime(2020),
                                     lastDate: DateTime(2030),
                                   );
-                                  if (picked != null) setState(() => _expenseDate = picked);
+                                  if (picked != null) {
+                                    setState(() => _expenseDate = picked);
+                                  }
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                   decoration: BoxDecoration(
                                     color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
                                     borderRadius: BorderRadius.circular(16),
@@ -363,16 +505,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.calendar_month_rounded, size: 16, color: AppColors.primary),
-                                      const SizedBox(width: 6),
+                                      const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.primary),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           _formatDate(_expenseDate),
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                          ),
+                                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -388,15 +526,75 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
                     const SizedBox(height: 14),
 
+                    // Payment Method Quick Selector
+                    Text(
+                      'Payment Method',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 38,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _paymentMethods.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (ctx, idx) {
+                          final pm = _paymentMethods[idx];
+                          final isSelected = _selectedPaymentMethod == pm['id'];
+
+                          return GestureDetector(
+                            onTap: () => setState(() => _selectedPaymentMethod = pm['id']!),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark ? const Color(0xFF131A29) : Colors.white),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : (isDark ? const Color(0xFF222F43) : const Color(0xFFE2E8F0)),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(pm['icon']!, style: const TextStyle(fontSize: 13)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    pm['label']!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMain),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
                     if (isPersonal) ...[
-                      // Personal Expense Notice Card
+                      // Personal Cashbook Banner
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF13221C) : const Color(0xFFECFDF5),
+                          color: const Color(0xFF10B981).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: const Color(0xFF10B981).withOpacity(isDark ? 0.35 : 0.4),
+                            color: const Color(0xFF10B981).withOpacity(0.35),
                             width: 1.2,
                           ),
                         ),
@@ -472,17 +670,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                       children: [
                                         CircleAvatar(
                                           radius: 12,
-                                          backgroundImage: NetworkImage(
-                                            _tripMembers.firstWhere(
-                                              (m) => m['name'] == _paidBy,
-                                              orElse: () => _tripMembers.first,
-                                            )['avatar'] as String,
+                                          backgroundColor: AppColors.primary,
+                                          child: Text(
+                                            _paidByName.isNotEmpty ? _paidByName[0].toUpperCase() : 'P',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            _paidBy,
+                                            _paidByName,
                                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -587,12 +784,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
                       const SizedBox(height: 14),
 
-                      // Interactive Split Summary Card (Equal or Custom)
+                      // Split Summary Breakdown Card
                       Builder(
-                        builder: (context) {
+                        builder: (ctx) {
+                          final includedCount = _tripMembers.where((m) => m['included'] == true).length;
                           final totalExpense = _getExpenseTotal();
-                          final includedList = _tripMembers.where((m) => m['included'] == true).toList();
-                          final includedCount = includedList.length;
                           final perPerson = includedCount > 0 ? (totalExpense / includedCount).round() : 0;
                           final customTotal = _getCustomAllocatedTotal();
 
@@ -721,7 +917,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                           children: [
                                             CircleAvatar(
                                               radius: 8,
-                                              backgroundImage: NetworkImage(m['avatar'] as String),
+                                              backgroundColor: AppColors.primary,
+                                              child: Text(
+                                                m['name'].toString().isNotEmpty ? m['name'].toString()[0].toUpperCase() : 'M',
+                                                style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                                              ),
                                             ),
                                             const SizedBox(width: 5),
                                             Text(
@@ -745,70 +945,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       ),
                     ],
 
-                    const SizedBox(height: 18),
-
-                    // Add Photos (Optional)
-                    Text(
-                      'Add Photos (Optional)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=150',
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150',
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Add More dashed container
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: AppColors.primary,
-                              style: BorderStyle.solid,
-                              width: 1.2,
-                            ),
-                          ),
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_a_photo_rounded, size: 20, color: AppColors.primary),
-                              SizedBox(height: 2),
-                              Text(
-                                'Add More',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.primary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
 
                     // Note (Optional)
                     TripSplitTextField(
@@ -822,21 +959,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
                     // Save Expense CTA Button
                     TripSplitButton(
-                      label: isPersonal ? 'Save Personal Expense' : 'Save Expense',
-                      trailingIcon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isPersonal
-                                  ? 'Personal expense recorded to Cashbook!'
-                                  : 'Expense added to ${_selectedTrip?['title'] ?? 'trip'} successfully!',
-                            ),
-                            backgroundColor: AppColors.positive,
-                          ),
-                        );
-                        Navigator.of(context).pushNamed('/all_expenses');
-                      },
+                      label: _isSaving
+                          ? 'Saving...'
+                          : (isPersonal ? 'Save Personal Expense' : 'Save Expense'),
+                      trailingIcon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                      onPressed: _isSaving ? () {} : () => _handleSaveExpense(isPersonal),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -849,7 +982,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
   }
 
-  // Active Trip Selector Card: Displays current trip & allows switching among ACTIVE trips only
+  // Active Trip Selector Card
   Widget _buildActiveTripSelectorCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -870,20 +1003,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              _selectedTrip?['image'] as String? ?? '',
-              width: 44,
-              height: 44,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 44,
-                height: 44,
-                color: AppColors.primary,
-                child: const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 20),
-              ),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -932,7 +1059,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _selectedTrip?['title'] as String? ?? 'Trip',
+                  _selectedTrip?['title'] ?? _selectedTrip?['name'] ?? 'Trip',
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
@@ -941,48 +1068,42 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  '${_selectedTrip?['destination'] ?? ''} • ${_selectedTrip?['membersCount'] ?? 5} members',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                  ),
-                ),
               ],
             ),
           ),
-          GestureDetector(
-            onTap: () => _showTripPickerBottomSheet(context, isDark),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Change',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+          if (_activeTrips.length > 1)
+            GestureDetector(
+              onTap: () => _showTripPickerBottomSheet(context, isDark),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.primary),
-                ],
+                    SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.primary),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  // Active Trips Switcher: Shows ONLY ACTIVE TRIPS
+  // Active Trips Switcher
   void _showTripPickerBottomSheet(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -1016,40 +1137,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Switch Active Trip',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Only active trips shown (${_activeTrips.length})',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF10B981),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Text(
+                    'Switch Active Trip',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -1060,12 +1154,15 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               const SizedBox(height: 16),
               ..._activeTrips.map((trip) {
                 final isSelected = trip['id'] == _selectedTrip?['id'];
+                final title = trip['title'] ?? trip['name'] ?? 'Trip';
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: GestureDetector(
                     onTap: () {
                       setState(() {
                         _selectedTrip = trip;
+                        _setupMembers();
                       });
                       Navigator.of(ctx).pop();
                     },
@@ -1085,68 +1182,26 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       ),
                       child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              trip['image'] as String,
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 48,
-                                height: 48,
-                                color: AppColors.primary,
-                                child: const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 20),
-                              ),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
+                            child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        trip['title'] as String,
-                                        style: TextStyle(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'ACTIVE',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF10B981),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${trip['destination']} • ${trip['membersCount']} members',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           if (isSelected)
                             const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
                           else
@@ -1198,27 +1253,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Who paid for this?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Total Bill: ₹ ${_getExpenseTotal().toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Who paid for this?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -1228,13 +1269,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               ),
               const SizedBox(height: 16),
               ..._tripMembers.map((member) {
-                final isSelected = member['name'] == _paidBy;
+                final isSelected = member['user_id'] == _paidByUserId;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
                     onTap: () {
                       setState(() {
-                        _paidBy = member['name'] as String;
+                        _paidByUserId = member['user_id'] as int?;
+                        _paidByName = member['name'] as String;
                       });
                       Navigator.of(ctx).pop();
                     },
@@ -1256,7 +1298,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         children: [
                           CircleAvatar(
                             radius: 16,
-                            backgroundImage: NetworkImage(member['avatar'] as String),
+                            backgroundColor: AppColors.primary,
+                            child: Text(
+                              member['name'].toString().isNotEmpty ? member['name'].toString()[0].toUpperCase() : 'M',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1361,7 +1407,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: GestureDetector(
                         onTap: () {
-                          // Prevent unchecking all members
                           if (isInc && includedCount <= 1) return;
                           setModalState(() {
                             member['included'] = !isInc;
@@ -1385,7 +1430,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 15,
-                                backgroundImage: NetworkImage(member['avatar'] as String),
+                                backgroundColor: AppColors.primary,
+                                child: Text(
+                                  member['name'].toString().isNotEmpty ? member['name'].toString()[0].toUpperCase() : 'M',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -1585,7 +1634,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundImage: NetworkImage(member['avatar'] as String),
+                                backgroundColor: AppColors.primary,
+                                child: Text(
+                                  member['name'].toString().isNotEmpty ? member['name'].toString()[0].toUpperCase() : 'M',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -1598,7 +1651,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   ),
                                 ),
                               ),
-                              // Decrement -50
                               IconButton(
                                 icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
                                 color: isDark ? Colors.white60 : Colors.black54,
@@ -1611,7 +1663,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   }
                                 },
                               ),
-                              // Amount Pill
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
@@ -1627,7 +1678,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   ),
                                 ),
                               ),
-                              // Increment +50
                               IconButton(
                                 icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
                                 color: AppColors.primary,

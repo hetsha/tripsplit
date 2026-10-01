@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_notifier.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/tripsplit_widgets.dart';
+import '../../core/api/api_client.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -19,6 +20,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<ThemeNotifier>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final auth = Provider.of<AuthService>(context);
+    final user = auth.currentUser;
+    final userName = user?.name ?? 'Guest User';
+    final userEmail = user?.email ?? (user?.phone ?? 'trip.splitter@example.com');
+    final initials = userName.trim().isNotEmpty
+        ? userName.trim().split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase()
+        : 'U';
+
+    Color userColor;
+    try {
+      final colorHex = (user?.avatarColor ?? '#6366F1').replaceAll('#', '');
+      userColor = Color(int.parse('FF$colorHex', radix: 16));
+    } catch (_) {
+      userColor = const Color(0xFF6366F1);
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
@@ -36,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 child: Column(
                   children: [
-                    // Profile Card with Beach Backdrop
+                    // Profile Card with Backdrop
                     TripSplitCard(
                       padding: EdgeInsets.zero,
                       borderRadius: 22,
@@ -48,15 +65,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                Image.network(
-                                  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-                                  height: 80,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
+                                Container(
+                                  height: 85,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        userColor.withOpacity(0.85),
+                                        const Color(0xFF3B82F6),
+                                        const Color(0xFF06B6D4),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
                                 ),
                                 Container(
-                                  height: 80,
-                                  color: Colors.black.withOpacity(0.3),
+                                  height: 85,
+                                  color: Colors.black.withOpacity(0.15),
                                 ),
                               ],
                             ),
@@ -74,30 +99,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 10,
+                                        color: Colors.black.withOpacity(0.12),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
                                       ),
                                     ],
                                   ),
-                                  child: const CircleAvatar(
+                                  child: CircleAvatar(
                                     radius: 36,
-                                    backgroundImage: NetworkImage(
-                                      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
+                                    backgroundColor: userColor,
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Text(
-                                  'Het Shah',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                  ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      userName,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                      ),
+                                    ),
+                                    if (user?.isAdmin == true) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'ADMIN',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'het@example.com',
+                                  userEmail,
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
@@ -188,6 +243,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 themeNotifier.toggleTheme();
                               },
                             ),
+                          ),
+                          Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                          _buildTile(
+                            icon: Icons.dns_rounded,
+                            iconColor: const Color(0xFF6366F1),
+                            title: 'Server & Network API',
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => TripSplitServerConfigDialog.show(context),
+                            isDark: isDark,
                           ),
                           Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
                           _buildTile(

@@ -25,8 +25,12 @@ class ApiEndpoints {
   static const String sync = 'sync.php';
   
   // Trips
+  static const String trip = 'trips.php';
+  static const String trips = 'trips.php';
   static const String tripsList = 'trips.php?action=list';
   static const String createTrip = 'trips.php?action=create';
+  static const String updateTrip = 'trips.php?action=update';
+  static const String deleteTrip = 'trips.php?action=delete';
   static const String joinTrip = 'trips.php?action=join';
   
   // Transactions & Expenses

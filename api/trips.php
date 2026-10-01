@@ -9,6 +9,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/validation.php';
+require_once __DIR__ . '/../includes/calculations.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -18,6 +19,123 @@ $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? $_POST['action'] ?? 'get';
 
 if ($method === 'GET') {
+    // 1. List all trips for the current user
+    if ($action === 'list') {
+        $userId = (int)$currentUser['id'];
+
+        $stmt = $db->prepare("
+            SELECT t.id, t.trip_code, t.url_token, t.name, t.description, t.starting_money, t.currency_symbol, t.created_at, tm.role
+            FROM trips t
+            JOIN trip_members tm ON tm.trip_id = t.id
+            WHERE tm.user_id = ?
+            ORDER BY t.created_at DESC
+        ");
+        $stmt->execute([$userId]);
+        $rawTrips = $stmt->fetchAll();
+
+        // If user has no joined trips, fetch all public/active trips
+        if (empty($rawTrips)) {
+            $stmt = $db->query("
+                SELECT t.id, t.trip_code, t.url_token, t.name, t.description, t.starting_money, t.currency_symbol, t.created_at, 'member' as role
+                FROM trips t
+                ORDER BY t.created_at DESC
+            ");
+            $rawTrips = $stmt->fetchAll();
+        }
+
+        $tripsList = [];
+        $totalSpentAll = 0.0;
+        $totalToReceiveAll = 0.0;
+        $totalToPayAll = 0.0;
+        $connectedFriends = [];
+        $activeTripsCount = 0;
+        $settledTripsCount = 0;
+
+        foreach ($rawTrips as $t) {
+            $tripId = (int)$t['id'];
+
+            // Fetch members
+            $memStmt = $db->prepare("
+                SELECT u.id, u.name, u.avatar_color 
+                FROM trip_members tm 
+                JOIN users u ON u.id = tm.user_id 
+                WHERE tm.trip_id = ?
+            ");
+            $memStmt->execute([$tripId]);
+            $tripMembers = $memStmt->fetchAll();
+            $membersCount = count($tripMembers);
+            foreach ($tripMembers as $tm) {
+                if ((int)$tm['id'] !== $userId) {
+                    $connectedFriends[(int)$tm['id']] = true;
+                }
+            }
+
+            // Total spent
+            $expStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE trip_id = ? AND type = 'expense'");
+            $expStmt->execute([$tripId]);
+            $totalSpent = (float)$expStmt->fetch()['total'];
+            $totalSpentAll += $totalSpent;
+
+            // Splitwise balances & user position
+            $balances = getSplitwiseBalances($tripId);
+            $myNet = isset($balances[$userId]) ? (float)$balances[$userId]['net_balance'] : 0.0;
+
+            if ($myNet > 0.01) {
+                $totalToReceiveAll += $myNet;
+            } elseif ($myNet < -0.01) {
+                $totalToPayAll += abs($myNet);
+            }
+
+            $isSettled = true;
+            foreach ($balances as $b) {
+                if (abs((float)$b['net_balance']) > 0.01) {
+                    $isSettled = false;
+                    break;
+                }
+            }
+
+            if ($isSettled && $totalSpent > 0) {
+                $settledTripsCount++;
+            } else {
+                $activeTripsCount++;
+            }
+
+            $tripsList[] = [
+                'id'              => $tripId,
+                'trip_code'       => $t['trip_code'],
+                'url_token'       => $t['url_token'],
+                'title'           => $t['name'],
+                'destination'     => $t['description'] ?: $t['name'],
+                'starting_money'  => (float)$t['starting_money'],
+                'total_budget'    => (float)$t['starting_money'] > 0 ? (float)$t['starting_money'] : max($totalSpent * 1.25, 5000),
+                'total_spent'     => $totalSpent,
+                'currency_symbol' => $t['currency_symbol'] ?: '₹',
+                'members_count'   => $membersCount,
+                'members'         => $tripMembers,
+                'role'            => $t['role'],
+                'my_net_balance'  => $myNet,
+                'is_positive'     => $myNet >= 0,
+                'is_settled'      => $isSettled,
+                'created_at'      => $t['created_at'],
+            ];
+        }
+
+        jsonSuccess('Trips list loaded', [
+            'trips' => $tripsList,
+            'stats' => [
+                'total_trips'      => count($tripsList),
+                'active_trips'     => $activeTripsCount,
+                'settled_trips'    => $settledTripsCount,
+                'total_spent'      => $totalSpentAll,
+                'total_to_receive' => $totalToReceiveAll,
+                'total_to_pay'     => $totalToPayAll,
+                'friends_count'    => count($connectedFriends),
+            ],
+            'user'  => $currentUser
+        ]);
+    }
+
+    // 2. Single trip details
     $tripId = (int)($_GET['trip_id'] ?? getActiveTripId());
     $membership = requireTripMembership($tripId, (int)$currentUser['id']);
 

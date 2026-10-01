@@ -10,6 +10,7 @@ class ApiClient {
   
   String? _sessionCookie;
   String? _csrfToken;
+  int? _userId;
   String _baseUrl = ApiEndpoints.defaultLocalBaseUrl;
 
   static final ApiClient _instance = ApiClient._internal();
@@ -21,8 +22,14 @@ class ApiClient {
     _dio.options.responseType = ResponseType.plain;
     
     // Load persisted session on init
+    _secureStorage.read(key: 'custom_base_url').then((v) {
+      if (v != null && v.trim().isNotEmpty) _baseUrl = v.trim();
+    });
     _secureStorage.read(key: 'session_cookie').then((v) => _sessionCookie = v);
     _secureStorage.read(key: 'csrf_token').then((v) => _csrfToken = v);
+    _secureStorage.read(key: 'user_id').then((v) {
+      if (v != null) _userId = int.tryParse(v);
+    });
     
     // Add custom Interceptor for cookie & csrf management
     _dio.interceptors.add(InterceptorsWrapper(
@@ -30,6 +37,11 @@ class ApiClient {
         // Enforce Content-Type
         options.headers['Content-Type'] = 'application/json';
         options.headers['Accept'] = 'application/json';
+        
+        // Attach user ID header
+        if (_userId != null) {
+          options.headers['X-User-Id'] = _userId.toString();
+        }
         
         // Attach session cookie if stored
         if (_sessionCookie != null) {
@@ -93,17 +105,50 @@ class ApiClient {
     ));
   }
 
-  void setBaseUrl(String url) {
-    _baseUrl = url;
+  Future<void> setBaseUrl(String url) async {
+    String formatted = url.trim();
+    if (!formatted.endsWith('/')) {
+      formatted += '/';
+    }
+    _baseUrl = formatted;
+    await _secureStorage.write(key: 'custom_base_url', value: formatted);
+  }
+
+  Future<Map<String, dynamic>> testConnection([String? testUrl]) async {
+    final urlToTest = (testUrl != null && testUrl.trim().isNotEmpty)
+        ? (testUrl.trim().endsWith('/') ? testUrl.trim() : '${testUrl.trim()}/')
+        : _baseUrl;
+    try {
+      final dio = Dio();
+      dio.options.connectTimeout = const Duration(seconds: 4);
+      dio.options.receiveTimeout = const Duration(seconds: 4);
+      final res = await dio.get('${urlToTest}trips.php?action=list');
+      return {'success': res.statusCode == 200, 'status': res.statusCode};
+    } on DioException catch (e) {
+      return {'success': false, 'error': e.type.name, 'message': e.message};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
   }
 
   String get baseUrl => _baseUrl;
 
+  void setUserId(int? id) {
+    _userId = id;
+    if (id != null) {
+      _secureStorage.write(key: 'user_id', value: id.toString());
+    } else {
+      _secureStorage.delete(key: 'user_id');
+    }
+  }
+
   Future<void> clearSession() async {
     _sessionCookie = null;
     _csrfToken = null;
+    _userId = null;
     await _secureStorage.delete(key: 'session_cookie');
     await _secureStorage.delete(key: 'csrf_token');
+    await _secureStorage.delete(key: 'user_id');
   }
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? queryParameters}) async {

@@ -158,7 +158,7 @@ if ($method === 'POST') {
                 INSERT INTO transactions (trip_id, type, amount, description, category_id, paid_by, payment_method, paid_from_pool, created_by, transaction_date, notes)
                 VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $paidFromPool = ($isPersonal) ? 0 : 1;
+            $paidFromPool = !empty($input['paid_from_pool']) ? 1 : 0;
             $stmt->execute([
                 $finalTripId,
                 $amount,

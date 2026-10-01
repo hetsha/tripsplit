@@ -9,25 +9,28 @@ class ExpenseService extends ChangeNotifier {
   Map<String, dynamic>? _dashboardData;
   List<Transaction> _transactionsList = [];
   List<Map<String, dynamic>> _categories = [];
+  Map<String, dynamic>? _settlementData;
   bool _isLoading = false;
 
   Map<String, dynamic>? get dashboardData => _dashboardData;
   List<Transaction> get transactionsList => _transactionsList;
   List<Map<String, dynamic>> get categories => _categories;
+  Map<String, dynamic>? get settlementData => _settlementData;
   bool get isLoading => _isLoading;
 
   // Load Dashboard Data
-  Future<void> loadDashboard() async {
+  Future<void> loadDashboard({int? tripId}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final res = await _apiClient.get(ApiEndpoints.dashboard);
+      final queryParams = tripId != null ? {'trip_id': tripId} : null;
+      final res = await _apiClient.get(ApiEndpoints.dashboard, queryParameters: queryParams);
       if (res['success'] == true && res['data'] != null) {
         _dashboardData = res['data'];
       }
     } catch (e) {
-      rethrow;
+      print('loadDashboard error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -35,13 +38,14 @@ class ExpenseService extends ChangeNotifier {
   }
 
   // Load Full Transactions list (all, expenses, settlements etc)
-  Future<void> loadTransactions({String type = 'all', String search = ''}) async {
+  Future<void> loadTransactions({int? tripId, String type = 'all', String search = ''}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
       final queryParams = {
         'type': type,
+        if (tripId != null) 'trip_id': tripId,
         if (search.isNotEmpty) 'search': search,
       };
       final res = await _apiClient.get(ApiEndpoints.transactions, queryParameters: queryParams);
@@ -50,7 +54,7 @@ class ExpenseService extends ChangeNotifier {
         _transactionsList = rawTx.map((t) => Transaction.fromJson(t)).toList();
       }
     } catch (e) {
-      rethrow;
+      print('loadTransactions error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -58,9 +62,10 @@ class ExpenseService extends ChangeNotifier {
   }
 
   // Load Categories list
-  Future<void> loadCategories() async {
+  Future<void> loadCategories({int? tripId}) async {
     try {
-      final res = await _apiClient.get(ApiEndpoints.categories);
+      final queryParams = tripId != null ? {'trip_id': tripId} : null;
+      final res = await _apiClient.get(ApiEndpoints.categories, queryParameters: queryParams);
       if (res['success'] == true && res['data'] != null) {
         final List rawCats = res['data']['categories'] ?? [];
         _categories = List<Map<String, dynamic>>.from(rawCats);
@@ -78,6 +83,7 @@ class ExpenseService extends ChangeNotifier {
     required bool isPersonal,
     required String clientRequestId,
     required List<Map<String, dynamic>> splits,
+    int? tripId,
     String? notes,
     int? expenseId,
   }) async {
@@ -90,6 +96,7 @@ class ExpenseService extends ChangeNotifier {
       'paid_by': paidBy,
       'payment_method': paymentMethod,
       'is_personal': isPersonal,
+      if (tripId != null && !isPersonal) 'trip_id': tripId,
       'client_request_id': clientRequestId,
       'splits': splits,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
@@ -97,7 +104,7 @@ class ExpenseService extends ChangeNotifier {
 
     try {
       await _apiClient.post(ApiEndpoints.expenses, payload);
-      await loadDashboard(); // refresh dashboard stats
+      await loadDashboard(tripId: tripId); // refresh dashboard stats
     } catch (e) {
       rethrow;
     }
@@ -116,8 +123,30 @@ class ExpenseService extends ChangeNotifier {
     }
   }
 
-  // Settle Up Payment
+  // Load Settlements Data (Suggestions, Balances, History)
+  Future<Map<String, dynamic>?> loadSettlements({int? tripId}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final queryParams = tripId != null ? {'trip_id': tripId} : null;
+      final res = await _apiClient.get(ApiEndpoints.settlements, queryParameters: queryParams);
+      if (res['success'] == true && res['data'] != null) {
+        _settlementData = Map<String, dynamic>.from(res['data']);
+        return _settlementData;
+      }
+    } catch (e) {
+      print('loadSettlements error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return null;
+  }
+
+  // Settle Up Single Direct Debt Payment
   Future<void> recordSettlement({
+    required int tripId,
     required int fromUser,
     required int toUser,
     required double amount,
@@ -125,6 +154,8 @@ class ExpenseService extends ChangeNotifier {
     String? notes,
   }) async {
     final payload = {
+      'action': 'settle',
+      'trip_id': tripId,
       'from_user': fromUser,
       'to_user': toUser,
       'amount': amount,
@@ -133,11 +164,27 @@ class ExpenseService extends ChangeNotifier {
     };
 
     try {
-      await _apiClient.post(ApiEndpoints.settleUp, payload);
-      await loadDashboard(); // refresh
+      await _apiClient.post(ApiEndpoints.settlements, payload);
+      await loadSettlements(tripId: tripId);
+      await loadDashboard(tripId: tripId);
     } catch (e) {
       rethrow;
     }
   }
 
+  // Settle All Debts for the trip at once
+  Future<void> settleAllDebts({required int tripId}) async {
+    final payload = {
+      'action': 'settle_all',
+      'trip_id': tripId,
+    };
+
+    try {
+      await _apiClient.post(ApiEndpoints.settlements, payload);
+      await loadSettlements(tripId: tripId);
+      await loadDashboard(tripId: tripId);
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

@@ -18,99 +18,17 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  final List<String> _filters = ['All Trips (4)', 'Active (3)', 'Settled (1)'];
+  final List<String> _filters = ['All Trips', 'Active', 'Settled'];
 
-  final List<Map<String, dynamic>> _groups = [
-    {
-      'id': 1,
-      'title': 'Goa Trip ✈️',
-      'destination': 'Goa, India',
-      'dates': '12 - 16 Dec 2024',
-      'image': 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 5,
-      'totalSpent': '₹ 24,650',
-      'totalBudget': '₹ 32,450',
-      'spentPercent': 0.76,
-      'netAmount': '+₹ 2,050',
-      'netLabel': 'You Receive',
-      'isPositive': true,
-      'isSettled': false,
-      'category': 'Beach Holiday',
-      'categoryIcon': Icons.beach_access_rounded,
-      'categoryColor': Color(0xFF06B6D4),
-      'avatars': [
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-        'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100',
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      ],
-    },
-    {
-      'id': 2,
-      'title': 'Manali Winter Trip 🏔️',
-      'destination': 'Manali, Himachal',
-      'dates': '5 - 10 Jan 2025',
-      'image': 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 4,
-      'totalSpent': '₹ 18,200',
-      'totalBudget': '₹ 25,000',
-      'spentPercent': 0.73,
-      'netAmount': '+₹ 2,070',
-      'netLabel': 'You Receive',
-      'isPositive': true,
-      'isSettled': false,
-      'category': 'Snow Adventure',
-      'categoryIcon': Icons.downhill_skiing_rounded,
-      'categoryColor': Color(0xFF6366F1),
-      'avatars': [
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-      ],
-    },
-    {
-      'id': 3,
-      'title': 'Weekend Roadtrip 🚗',
-      'destination': 'Lonavala & Khandala',
-      'dates': '22 - 24 Nov 2024',
-      'image': 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 3,
-      'totalSpent': '₹ 6,400',
-      'totalBudget': '₹ 8,000',
-      'spentPercent': 0.80,
-      'netAmount': '-₹ 850',
-      'netLabel': 'You Owe',
-      'isPositive': false,
-      'isSettled': false,
-      'category': 'Weekend Trip',
-      'categoryIcon': Icons.directions_car_rounded,
-      'categoryColor': Color(0xFFF59E0B),
-      'avatars': [
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      ],
-    },
-    {
-      'id': 4,
-      'title': 'Udaipur Heritage Tour 🏰',
-      'destination': 'Udaipur, Rajasthan',
-      'dates': '10 - 14 Oct 2024',
-      'image': 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=800&auto=format&fit=crop&q=80',
-      'membersCount': 5,
-      'totalSpent': '₹ 42,000',
-      'totalBudget': '₹ 42,000',
-      'spentPercent': 1.0,
-      'netAmount': '₹ 0',
-      'netLabel': 'All Settled',
-      'isPositive': true,
-      'isSettled': true,
-      'category': 'Heritage Tour',
-      'categoryIcon': Icons.castle_rounded,
-      'categoryColor': Color(0xFFEC4899),
-      'avatars': [
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-        'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100',
-      ],
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      auth.checkAuth();
+      auth.fetchTripsList();
+    });
+  }
 
   @override
   void dispose() {
@@ -130,7 +48,93 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
         ? currentUser.name.toUpperCase()
         : 'HET SHAH';
 
-    final displayedGroups = _groups.where((g) {
+    final rawTrips = auth.detailedTrips;
+    final sampleCovers = [
+      'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=800&auto=format&fit=crop&q=80',
+    ];
+
+    final allGroups = rawTrips.isNotEmpty
+        ? rawTrips.map((t) {
+            final id = t['id'] as int? ?? 1;
+            final title = t['title'] as String? ?? 'Trip';
+            final dest = t['destination'] as String? ?? 'Destination';
+            final spent = (t['total_spent'] as num?)?.toDouble() ?? 0.0;
+            final budget = (t['total_budget'] as num?)?.toDouble() ?? 10000.0;
+            final myNet = (t['my_net_balance'] as num?)?.toDouble() ?? 0.0;
+            final isSettled = t['is_settled'] as bool? ?? false;
+            final membersCount = t['members_count'] as int? ?? 1;
+            final coverIndex = (id - 1) % sampleCovers.length;
+
+            final spentPercent = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.5;
+
+            String netLabel;
+            String netAmount;
+            bool isPositive = true;
+
+            if (isSettled || myNet.abs() < 1) {
+              netLabel = 'All Settled';
+              netAmount = '₹ 0';
+              isPositive = true;
+            } else if (myNet > 0) {
+              netLabel = 'You Receive';
+              netAmount = '+₹ ${myNet.toStringAsFixed(0)}';
+              isPositive = true;
+            } else {
+              netLabel = 'You Owe';
+              netAmount = '-₹ ${myNet.abs().toStringAsFixed(0)}';
+              isPositive = false;
+            }
+
+            return {
+              'id': id,
+              'title': title,
+              'destination': dest,
+              'dates': t['created_at'] != null ? t['created_at'].toString().split(' ').first : 'Active',
+              'image': sampleCovers[coverIndex < 0 ? 0 : coverIndex],
+              'membersCount': membersCount,
+              'totalSpent': '₹ ${spent.toStringAsFixed(0)}',
+              'totalBudget': '₹ ${budget.toStringAsFixed(0)}',
+              'spentPercent': spentPercent,
+              'netAmount': netAmount,
+              'netLabel': netLabel,
+              'isPositive': isPositive,
+              'isSettled': isSettled,
+              'category': 'Adventure',
+              'categoryIcon': Icons.travel_explore_rounded,
+              'categoryColor': const Color(0xFF6366F1),
+              'avatars': (t['members'] as List?)
+                      ?.map((m) => 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100')
+                      .take(3)
+                      .toList() ??
+                  [],
+            };
+          }).toList()
+        : <Map<String, dynamic>>[];
+
+    final stats = auth.tripStats;
+    final totalSpentNum = (stats['total_spent'] as num?)?.toDouble() ?? 0.0;
+    final toReceiveNum = (stats['total_to_receive'] as num?)?.toDouble() ?? 0.0;
+    final toPayNum = (stats['total_to_pay'] as num?)?.toDouble() ?? 0.0;
+
+    final balanceStr = '₹ ${totalSpentNum.toStringAsFixed(0)}';
+    final toReceiveStr = toReceiveNum > 0 ? '+₹ ${toReceiveNum.toStringAsFixed(0)}' : '+₹ 0';
+    final toPayStr = toPayNum > 0 ? '-₹ ${toPayNum.toStringAsFixed(0)}' : '-₹ 0';
+
+    final totalTripsCount = (stats['total_trips'] as num?)?.toInt() ?? allGroups.length;
+    final activeTripsCount = (stats['active_trips'] as num?)?.toInt() ?? allGroups.where((g) => !(g['isSettled'] as bool)).length;
+    final settledTripsCount = (stats['settled_trips'] as num?)?.toInt() ?? allGroups.where((g) => (g['isSettled'] as bool)).length;
+    final friendsCount = (stats['friends_count'] as num?)?.toInt() ?? 0;
+
+    final filterPills = [
+      'All Trips ($totalTripsCount)',
+      'Active ($activeTripsCount)',
+      'Settled ($settledTripsCount)'
+    ];
+
+    final displayedGroups = allGroups.where((g) {
       if (_selectedFilterIndex == 1 && (g['isSettled'] as bool)) return false;
       if (_selectedFilterIndex == 2 && !(g['isSettled'] as bool)) return false;
 
@@ -149,143 +153,151 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
         child: Column(
           children: [
             // Top Bar with Greeting, Screens switcher & Profile
-            _buildHeader(isDark, cardHolder),
+            _buildHeader(isDark, cardHolder, activeTripsCount),
 
             // Scrollable Content
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Security Vault Label
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFF59E0B),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'TRIPSPLIT DIGITAL VAULT',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
-                                  color: isDark ? Colors.white60 : Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
+              child: RefreshIndicator(
+                onRefresh: () => auth.fetchTripsList(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Security Vault Label
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
-                                Icon(Icons.lock_outline_rounded, size: 11, color: Color(0xFFF59E0B)),
-                                SizedBox(width: 4),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF59E0B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  '256-Bit Encrypted',
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+                                  'TRIPSPLIT DIGITAL VAULT',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                    color: isDark ? Colors.white60 : Colors.black54,
+                                  ),
                                 ),
                               ],
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock_outline_rounded, size: 11, color: Color(0xFFF59E0B)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '256-Bit Encrypted',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 1. PAYMENT CARD
+                      TripSplitPaymentCard(
+                        cardHolder: cardHolder,
+                        loginNumber: loginPhone,
+                        balance: balanceStr,
+                        toReceive: toReceiveStr,
+                        toPay: toPayStr,
+                        onTap: () => Navigator.of(context).pushNamed('/dashboard'),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // 2. DEDICATED EXPENSE ACTION BAR
+                      _buildExpenseActionSection(context, isDark),
+
+                      const SizedBox(height: 18),
+
+                      // 3. STATS STRIP
+                      _buildStatsRow(
+                        isDark,
+                        tripsValue: '$totalTripsCount Trips',
+                        activeValue: '$activeTripsCount Active',
+                        spentValue: '₹ ${totalSpentNum.toStringAsFixed(0)}',
+                        friendsValue: '$friendsCount Friends',
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      // 4. SEARCH & FILTER PILLS
+                      _buildSearchBar(isDark),
+
+                      const SizedBox(height: 14),
+
+                      // Section Title Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Your Travel Groups',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          // Filter Pills
+                          Row(
+                            children: List.generate(filterPills.length, (index) {
+                              final isSelected = index == _selectedFilterIndex;
+                              final label = filterPills[index].split(' ').first;
+                              return GestureDetector(
+                                onTap: () => setState(() => _selectedFilterIndex = index),
+                                child: Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.surfaceDark : Colors.white),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : (isDark ? AppColors.borderDark : AppColors.borderLight),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMain),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
                           ),
                         ],
                       ),
-                    ),
-
-                    // 1. PAYMENT CARD (KEPT UNCHANGED AS REQUESTED)
-                    TripSplitPaymentCard(
-                      cardHolder: cardHolder,
-                      loginNumber: loginPhone,
-                      balance: '₹ 32,450',
-                      toReceive: '+₹ 4,120',
-                      toPay: '-₹ 850',
-                      onTap: () => Navigator.of(context).pushNamed('/dashboard'),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    // 2. DEDICATED EXPENSE ACTION BAR (PERSONAL OR TRIP)
-                    _buildExpenseActionSection(context, isDark),
-
-                    const SizedBox(height: 18),
-
-                    // 3. STATS STRIP
-                    _buildStatsRow(isDark),
-
-                    const SizedBox(height: 22),
-
-                    // 4. SEARCH & FILTER PILLS
-                    _buildSearchBar(isDark),
-
-                    const SizedBox(height: 14),
-
-                    // Section Title Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Your Travel Groups',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        // Filter Pills
-                        Row(
-                          children: List.generate(_filters.length, (index) {
-                            final isSelected = index == _selectedFilterIndex;
-                            final label = _filters[index].split(' ').first;
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedFilterIndex = index),
-                              child: Container(
-                                margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : (isDark ? AppColors.surfaceDark : Colors.white),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : (isDark ? AppColors.borderDark : AppColors.borderLight),
-                                  ),
-                                ),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark ? AppColors.textDarkMuted : AppColors.textLightMain),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ],
-                    ),
 
                     const SizedBox(height: 14),
 
@@ -352,9 +364,10 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
                 ),
               ),
             ),
+          ),
 
-            // Bottom Navigation
-            _buildBottomNav(context, isDark),
+          // Bottom Navigation
+          _buildBottomNav(context, isDark),
           ],
         ),
       ),
@@ -372,7 +385,16 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
     final avatars = (group['avatars'] as List<String>?) ?? [];
 
     return GestureDetector(
-      onTap: () => Navigator.of(context).pushNamed('/dashboard'),
+      onTap: () {
+        final auth = Provider.of<AuthService>(context, listen: false);
+        if (group['id'] != null && group['id'] is int) {
+          auth.switchTrip(group['id'] as int);
+        }
+        Navigator.of(context).pushNamed(
+          '/dashboard',
+          arguments: {'tripId': group['id'], 'trip': group},
+        );
+      },
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF141A28) : Colors.white,
@@ -818,7 +840,7 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
   }
 
   // Header Bar
-  Widget _buildHeader(bool isDark, String cardHolder) {
+  Widget _buildHeader(bool isDark, String cardHolder, int activeCount) {
     final firstName = cardHolder.split(' ').first;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
@@ -867,8 +889,8 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
                   ],
                 ),
                 Text(
-                  '4 Active Travel Groups',
-                  style: TextStyle(
+                  '$activeCount Active Travel ${activeCount == 1 ? 'Group' : 'Groups'}',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
@@ -1340,8 +1362,8 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
 
   // Active Trips Selection Bottom Sheet: Shows ONLY ACTIVE TRIPS
   void _showSelectActiveTripBottomSheet(BuildContext context, bool isDark) {
-    // Filter strictly for ACTIVE trips only (isSettled == false)
-    final activeTrips = _groups.where((g) => !(g['isSettled'] as bool)).toList();
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final activeTrips = auth.detailedTrips.where((g) => !(g['is_settled'] as bool? ?? false)).toList();
 
     showModalBottomSheet(
       context: context,
@@ -1417,113 +1439,96 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              ...activeTrips.map((trip) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).pushNamed(
-                        '/add_expense',
-                        arguments: {
-                          'isPersonal': false,
-                          'trip': trip,
-                          'activeTrips': activeTrips,
-                        },
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF172033) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0),
-                          width: 1.2,
+              if (activeTrips.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      const Icon(Icons.flight_takeoff_rounded, size: 36, color: Colors.grey),
+                      const SizedBox(height: 10),
+                      Text(
+                        'No active trips found in database',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white70 : Colors.black87,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              trip['image'] as String,
-                              width: 52,
-                              height: 52,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 52,
-                                height: 52,
-                                color: AppColors.primary,
-                                child: const Icon(Icons.flight_takeoff_rounded, color: Colors.white),
+                    ],
+                  ),
+                )
+              else
+                ...activeTrips.map((trip) {
+                  final tripTitle = trip['title'] ?? trip['name'] ?? 'Trip';
+                  final tripDest = trip['destination'] ?? trip['description'] ?? 'Active';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pushNamed(
+                          '/add_expense',
+                          arguments: {
+                            'isPersonal': false,
+                            'trip': trip,
+                            'tripId': trip['id'],
+                            'activeTrips': activeTrips,
+                          },
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF172033) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tripTitle as String,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    tripDest as String,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        trip['title'] as String,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'ACTIVE',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF10B981),
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${trip['destination']} • ${trip['membersCount']} friends',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Total Spent: ${trip['totalSpent']}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
-                        ],
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
             ],
           ),
         );
@@ -1532,7 +1537,13 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
   }
 
   // Stats Strip
-  Widget _buildStatsRow(bool isDark) {
+  Widget _buildStatsRow(
+    bool isDark, {
+    String tripsValue = '4 Trips',
+    String activeValue = '3 Active',
+    String spentValue = '₹ 91,250',
+    String friendsValue = '12 Friends',
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -1545,11 +1556,11 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStat('4 Trips', '3 Active', const Color(0xFF6366F1), Icons.flight_rounded, isDark),
+          _buildStat(tripsValue, activeValue, const Color(0xFF6366F1), Icons.flight_rounded, isDark),
           Container(width: 1, height: 28, color: isDark ? Colors.white12 : Colors.black12),
-          _buildStat('₹ 91,250', 'Total Spent', const Color(0xFF10B981), Icons.currency_rupee_rounded, isDark),
+          _buildStat(spentValue, 'Total Spent', const Color(0xFF10B981), Icons.currency_rupee_rounded, isDark),
           Container(width: 1, height: 28, color: isDark ? Colors.white12 : Colors.black12),
-          _buildStat('12 Friends', 'Connected', const Color(0xFFF59E0B), Icons.group_rounded, isDark),
+          _buildStat(friendsValue, 'Connected', const Color(0xFFF59E0B), Icons.group_rounded, isDark),
         ],
       ),
     );
@@ -1872,67 +1883,78 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // List of trips with photos count
-              ..._groups.map((trip) {
-                final photoCount = trip['id'] == 1
-                    ? 24
-                    : (trip['id'] == 2 ? 18 : (trip['id'] == 3 ? 12 : 35));
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF192236) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF28364F) : const Color(0xFFE2E8F0),
+              // List of trips from database
+              if (Provider.of<AuthService>(context, listen: false).detailedTrips.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'No trips found. Create a trip first!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
                     ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        trip['image'] as String,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
+                )
+              else
+                ...Provider.of<AuthService>(context, listen: false).detailedTrips.map((trip) {
+                  final tripTitle = trip['title'] ?? trip['name'] ?? 'Trip';
+                  final tripId = trip['id'];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF192236) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF28364F) : const Color(0xFFE2E8F0),
                       ),
                     ),
-                    title: Text(
-                      trip['title'] as String,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    subtitle: Row(
-                      children: [
-                        const Icon(Icons.photo_outlined, size: 12, color: AppColors.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$photoCount Photos • ${trip['dates']}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                          ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
+                        child: const Icon(Icons.photo_library_rounded, color: AppColors.primary, size: 22),
+                      ),
+                      title: Text(
+                        tripTitle as String,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      subtitle: Row(
+                        children: [
+                          const Icon(Icons.photo_outlined, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Shared Memories',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pushNamed(
+                          '/gallery',
+                          arguments: {
+                            'tripId': tripId,
+                            'tripTitle': tripTitle,
+                          },
+                        );
+                      },
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).pushNamed(
-                        '/gallery',
-                        arguments: {
-                          'tripId': trip['id'],
-                          'tripTitle': trip['title'],
-                        },
-                      );
-                    },
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
             ],
           ),
         );

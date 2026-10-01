@@ -34,6 +34,169 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Alias getter for trip
+  Trip? get trip => activeTrip;
+
+  List<Map<String, dynamic>> _detailedTrips = [];
+  Map<String, dynamic> _tripStats = {};
+  bool _isFetchingTrips = false;
+
+  List<Map<String, dynamic>> get detailedTrips => _detailedTrips;
+  Map<String, dynamic> get tripStats => _tripStats;
+  bool get isFetchingTrips => _isFetchingTrips;
+
+  // Load Trips with full aggregated financial & member details from database
+  Future<void> fetchTripsList() async {
+    _isFetchingTrips = true;
+    notifyListeners();
+
+    try {
+      final res = await _apiClient.get(ApiEndpoints.tripsList);
+      if (res['success'] == true && res['data'] != null) {
+        final data = res['data'];
+        if (data['trips'] is List) {
+          _detailedTrips = List<Map<String, dynamic>>.from(data['trips']);
+          _trips = _detailedTrips.map((t) => Trip.fromJson(t)).toList();
+        }
+        if (data['stats'] is Map) {
+          _tripStats = Map<String, dynamic>.from(data['stats']);
+        }
+        if (data['user'] != null && _currentUser == null) {
+          _currentUser = User.fromJson(data['user']);
+        }
+        if (_activeTripId == null && _detailedTrips.isNotEmpty) {
+          _activeTripId = _detailedTrips.first['id'] as int?;
+        }
+      }
+    } catch (e) {
+      print('fetchTripsList error: $e');
+    } finally {
+      _isFetchingTrips = false;
+      notifyListeners();
+    }
+  }
+
+  // Create Trip in Database
+  Future<Map<String, dynamic>> createTrip({
+    required String name,
+    String? description,
+    double? startingMoney,
+    List<String>? members,
+  }) async {
+    final payload = {
+      'action': 'create',
+      'name': name,
+      if (description != null && description.isNotEmpty) 'description': description,
+      if (startingMoney != null && startingMoney > 0) 'starting_money': startingMoney,
+      if (members != null && members.isNotEmpty) 'members': members,
+    };
+
+    final res = await _apiClient.post(ApiEndpoints.createTrip, payload);
+    if (res['success'] == true && res['data'] != null) {
+      final newId = res['data']['trip_id'];
+      if (newId != null) {
+        _activeTripId = int.tryParse(newId.toString());
+      }
+      await fetchTripsList();
+      return res['data'];
+    } else {
+      throw Exception(res['message'] ?? 'Failed to create trip');
+    }
+  }
+
+  // Update Trip Settings
+  Future<void> updateTrip({
+    required int tripId,
+    required String name,
+    String? description,
+    double? startingMoney,
+  }) async {
+    final payload = {
+      'action': 'update',
+      'trip_id': tripId,
+      'name': name,
+      if (description != null) 'description': description,
+      if (startingMoney != null) 'starting_money': startingMoney,
+      'starting_payment_method': 'cash',
+    };
+
+    final res = await _apiClient.post(ApiEndpoints.trips, payload);
+    if (res['success'] == true) {
+      await fetchTripsList();
+    } else {
+      throw Exception(res['message'] ?? 'Failed to update trip');
+    }
+  }
+
+  // Delete Trip
+  Future<void> deleteTrip({required int tripId}) async {
+    final payload = {
+      'action': 'delete',
+      'trip_id': tripId,
+    };
+
+    final res = await _apiClient.post(ApiEndpoints.trips, payload);
+    if (res['success'] == true) {
+      if (_activeTripId == tripId) {
+        _activeTripId = null;
+      }
+      await fetchTripsList();
+    } else {
+      throw Exception(res['message'] ?? 'Failed to delete trip');
+    }
+  }
+
+  // Load Members for a Trip
+  Future<Map<String, dynamic>> loadTripMembers({required int tripId}) async {
+    final res = await _apiClient.get(ApiEndpoints.members, queryParameters: {'trip_id': tripId});
+    if (res['success'] == true && res['data'] != null) {
+      return Map<String, dynamic>.from(res['data']);
+    }
+    return {};
+  }
+
+  // Add Member to Trip
+  Future<void> addMemberToTrip({
+    required int tripId,
+    required String name,
+    String? email,
+    String? phone,
+  }) async {
+    final payload = {
+      'action': 'add',
+      'trip_id': tripId,
+      'name': name,
+      if (email != null && email.isNotEmpty) 'email': email,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+    };
+
+    final res = await _apiClient.post(ApiEndpoints.members, payload);
+    if (res['success'] == true) {
+      await fetchTripsList();
+    } else {
+      throw Exception(res['message'] ?? 'Failed to add member');
+    }
+  }
+
+  // Remove Member from Trip
+  Future<void> removeMemberFromTrip({
+    required int tripId,
+    required int userId,
+  }) async {
+    final payload = {
+      'action': 'remove',
+      'trip_id': tripId,
+      'user_id': userId,
+    };
+
+    final res = await _apiClient.post(ApiEndpoints.members, payload);
+    if (res['success'] == true) {
+      await fetchTripsList();
+    } else {
+      throw Exception(res['message'] ?? 'Failed to remove member');
+    }
+  }
+
   // Initialize and check current session status
   Future<void> checkAuth() async {
     _state = AuthState.loading;
@@ -44,6 +207,7 @@ class AuthService extends ChangeNotifier {
       if (res['success'] == true && res['data'] != null) {
         final data = res['data'];
         _currentUser = User.fromJson(data['user']);
+        _apiClient.setUserId(_currentUser?.id);
         
         if (data['trips'] is List) {
           final List rawTrips = data['trips'];
@@ -61,6 +225,9 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       _state = AuthState.unauthenticated;
     }
+    
+    // Also load detailed trips list from DB
+    await fetchTripsList();
     notifyListeners();
   }
 

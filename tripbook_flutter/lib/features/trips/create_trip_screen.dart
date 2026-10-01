@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tripsplit_widgets.dart';
 
@@ -14,13 +16,21 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final _destinationController = TextEditingController(text: 'Goa, India');
   DateTime _startDate = DateTime(2024, 12, 12);
   DateTime _endDate = DateTime(2024, 12, 16);
+  bool _isSubmitting = false;
 
-  final List<Map<String, String>> _members = [
-    {'name': 'You (Het)', 'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'},
-    {'name': 'Rahul', 'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100'},
-    {'name': 'Priya', 'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100'},
-    {'name': 'Amit', 'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'},
-  ];
+  final List<Map<String, String>> _members = [];
+  bool _membersInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_membersInitialized) {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final currentUserName = auth.currentUser?.name ?? 'You';
+      _members.add({'name': 'You ($currentUserName)', 'avatar': ''});
+      _membersInitialized = true;
+    }
+  }
 
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -79,6 +89,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             TripSplitHeader(
               title: 'Create a New Trip',
               onBack: () => Navigator.of(context).maybePop(),
+              rightAction: IconButton(
+                icon: const Icon(Icons.dns_rounded, color: AppColors.primary),
+                tooltip: 'Server & IP Settings',
+                onPressed: () => TripSplitServerConfigDialog.show(context),
+              ),
             ),
 
             Expanded(
@@ -327,20 +342,68 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Create Trip Button
-                    TripSplitButton(
-                      label: 'Create Trip',
-                      trailingIcon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Trip "${_tripNameController.text}" created successfully!'),
-                            backgroundColor: AppColors.positive,
+                    // Create Trip Button with DB Persistence
+                    _isSubmitting
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : TripSplitButton(
+                            label: 'Create Trip',
+                            trailingIcon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                            onPressed: () async {
+                              final name = _tripNameController.text.trim();
+                              if (name.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please enter a trip name')),
+                                );
+                                return;
+                              }
+
+                              setState(() => _isSubmitting = true);
+                              try {
+                                final auth = Provider.of<AuthService>(context, listen: false);
+                                final memberNames = _members
+                                    .map((m) => m['name'] ?? '')
+                                    .where((n) => n.trim().isNotEmpty && !n.startsWith('You'))
+                                    .toList();
+                                final dest = _destinationController.text.trim();
+
+                                await auth.createTrip(
+                                  name: name,
+                                  description: dest.isNotEmpty ? dest : null,
+                                  members: memberNames,
+                                );
+
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Trip "$name" created successfully!'),
+                                    backgroundColor: AppColors.positive,
+                                  ),
+                                );
+                                Navigator.of(context).pushReplacementNamed('/home');
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cannot connect: $e'),
+                                    backgroundColor: AppColors.negative,
+                                    duration: const Duration(seconds: 8),
+                                    action: SnackBarAction(
+                                      label: 'Change IP',
+                                      textColor: Colors.white,
+                                      onPressed: () => TripSplitServerConfigDialog.show(context),
+                                    ),
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _isSubmitting = false);
+                              }
+                            },
                           ),
-                        );
-                        Navigator.of(context).pushNamed('/dashboard');
-                      },
-                    ),
                     const SizedBox(height: 24),
                   ],
                 ),

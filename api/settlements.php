@@ -54,6 +54,8 @@ if ($method === 'GET') {
 
     jsonSuccess('Settlement data', [
         'suggestions'     => $suggestions,
+        'my_balance'      => $memberBalances[(int)$currentUser['id']] ?? null,
+        'all_balances'    => array_values($memberBalances),
         'member_balances' => array_values(array_filter($memberBalances, fn($b) => $b['user_id'] === (int)$currentUser['id'])),
         'history'         => $history
     ]);
@@ -65,7 +67,7 @@ if ($method === 'POST') {
     $act = $input['action'] ?? $action;
 
     // Record a debt settlement
-    if ($act === 'settle') {
+    if ($act === 'settle' || $act === 'create') {
         $fromUser = (int)($input['from_user'] ?? $currentUser['id']);
         $toUser = (int)($input['to_user'] ?? 0);
         $amount = validateAmount($input['amount'] ?? 0.0, 'Settlement Amount');
@@ -101,6 +103,41 @@ if ($method === 'POST') {
         createNotification($tripId, 'settlement_made', "$fromName paid $toName " . formatMoney($amount, $currencySymbol ?? '₹'));
 
         jsonSuccess('Settlement marked as paid successfully!');
+    }
+
+    // Settle all outstanding debts for the trip
+    if ($act === 'settle_all') {
+        $suggestions = calculateSimplifiedSettlements($tripId);
+        if (empty($suggestions)) {
+            jsonSuccess('Trip is already fully settled!');
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $stmt = $db->prepare("
+            INSERT INTO settlements (trip_id, from_user, to_user, amount, payment_method, status, notes, paid_at)
+            VALUES (?, ?, ?, ?, 'cash', 'paid', 'Trip marked as fully settled', ?)
+        ");
+
+        $db->beginTransaction();
+        try {
+            foreach ($suggestions as $s) {
+                $stmt->execute([
+                    $tripId,
+                    (int)$s['from_user_id'],
+                    (int)$s['to_user_id'],
+                    (float)$s['amount'],
+                    $now
+                ]);
+            }
+            $db->commit();
+            createNotification($tripId, 'trip_settled', "All debts for this trip were marked as fully settled.");
+            jsonSuccess('All trip debts have been marked as settled successfully!');
+        } catch (Exception $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            jsonError('Failed to settle all debts: ' . $e->getMessage(), 500);
+        }
     }
 
     // Undo/Delete Settlement

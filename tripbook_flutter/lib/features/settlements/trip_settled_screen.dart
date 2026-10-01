@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tripsplit_widgets.dart';
+import '../../services/auth_service.dart';
+import '../../services/expense_service.dart';
 
 class TripSettledScreen extends StatelessWidget {
   const TripSettledScreen({Key? key}) : super(key: key);
@@ -8,54 +11,72 @@ class TripSettledScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final auth = Provider.of<AuthService>(context);
+    final expense = Provider.of<ExpenseService>(context);
 
-    final membersStatus = [
-      {
-        'name': 'You (Het)',
-        'paid': '₹ 8,540',
-        'share': '₹ 6,490',
-        'status': '+₹ 2,050',
-        'statusLabel': 'You received',
+    final currentUserId = auth.currentUser?.id ?? 0;
+    final int? tripId = args?['tripId'] ?? args?['trip']?['id'] ?? auth.activeTripId;
+
+    Map<String, dynamic>? trip;
+    if (args?['trip'] != null) {
+      trip = args!['trip'] as Map<String, dynamic>;
+    } else if (auth.detailedTrips.isNotEmpty && tripId != null) {
+      trip = auth.detailedTrips.firstWhere(
+        (t) => t['id'] == tripId,
+        orElse: () => auth.detailedTrips.first,
+      );
+    }
+
+    final tripTitle = trip?['title'] ?? trip?['name'] ?? 'Trip';
+    final tripDestination = trip?['destination'] ?? 'Travel Group';
+    final double totalSpent = (trip?['total_spent'] as num?)?.toDouble() ??
+        (expense.dashboardData?['summary']?['total_expenses'] as num?)?.toDouble() ??
+        0.0;
+
+    // Balances
+    final List rawBalances = expense.settlementData?['all_balances'] ??
+        expense.dashboardData?['member_balances'] ??
+        [];
+
+    final int membersCount = rawBalances.isNotEmpty
+        ? rawBalances.length
+        : ((trip?['members_count'] as num?)?.toInt() ?? 1);
+
+    final double fairShare = membersCount > 0 ? (totalSpent / membersCount) : 0.0;
+
+    double youPaid = 0.0;
+    double youReceived = 0.0;
+
+    for (var b in rawBalances) {
+      final uid = b['user_id'] is int ? b['user_id'] : int.tryParse(b['user_id'].toString()) ?? 0;
+      if (uid == currentUserId) {
+        youPaid = (b['total_paid'] as num?)?.toDouble() ?? 0.0;
+        final net = (b['net_balance'] as num?)?.toDouble() ?? 0.0;
+        youReceived = net > 0 ? net : 0.0;
+        break;
+      }
+    }
+
+    final membersStatus = rawBalances.map((m) {
+      final uid = m['user_id'] is int ? m['user_id'] : int.tryParse(m['user_id'].toString()) ?? 0;
+      final name = m['name'] as String? ?? 'Member';
+      final isCurrentUser = uid == currentUserId;
+      final paid = (m['total_paid'] as num?)?.toDouble() ?? 0.0;
+      final share = (m['total_share'] as num?)?.toDouble() ?? fairShare;
+      final balance = (m['net_balance'] as num?)?.toDouble() ?? 0.0;
+      final isPositive = balance >= 0;
+
+      return {
+        'name': isCurrentUser ? 'You ($name)' : name,
+        'paid': '₹ ${paid.toStringAsFixed(0)}',
+        'share': '₹ ${share.toStringAsFixed(0)}',
+        'status': '₹ 0',
+        'statusLabel': isPositive ? 'Balanced' : 'Settled',
         'isPositive': true,
-        'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      },
-      {
-        'name': 'Rahul',
-        'paid': '₹ 8,500',
-        'share': '₹ 6,490',
-        'status': '-₹ 2,050',
-        'statusLabel': 'You paid',
-        'isPositive': false,
-        'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100',
-      },
-      {
-        'name': 'Priya',
-        'paid': '₹ 6,200',
-        'share': '₹ 6,490',
-        'status': '-₹ 290',
-        'statusLabel': 'You paid',
-        'isPositive': false,
-        'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      },
-      {
-        'name': 'Amit',
-        'paid': '₹ 5,940',
-        'share': '₹ 6,490',
-        'status': '-₹ 550',
-        'statusLabel': 'You paid',
-        'isPositive': false,
-        'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-      },
-      {
-        'name': 'Neha',
-        'paid': '₹ 4,870',
-        'share': '₹ 6,490',
-        'status': '-₹ 1,620',
-        'statusLabel': 'You paid',
-        'isPositive': false,
-        'avatar': 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      },
-    ];
+        'avatar_color': m['avatar_color'] ?? '#3b82f6',
+      };
+    }).toList();
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
@@ -111,7 +132,7 @@ class TripSettledScreen extends StatelessWidget {
                     const SizedBox(height: 6),
 
                     Text(
-                      'All expenses have been settled among 5 members.',
+                      'All accounts and balances in $tripTitle are now completely balanced.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -126,14 +147,14 @@ class TripSettledScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.network(
-                              'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=200',
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
+                            child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 26),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -141,7 +162,7 @@ class TripSettledScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Goa Trip ✈️',
+                                  tripTitle,
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
@@ -150,7 +171,7 @@ class TripSettledScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  '12 - 16 Dec 2024 • Goa, India',
+                                  '$tripDestination • $membersCount Members',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
@@ -162,19 +183,19 @@ class TripSettledScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.brandLavender,
+                              color: const Color(0xFF10B981).withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.star_rounded, size: 12, color: AppColors.primary),
+                                Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF10B981)),
                                 SizedBox(width: 4),
                                 Text(
                                   'Settled',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF10B981),
                                   ),
                                 ),
                               ],
@@ -192,10 +213,10 @@ class TripSettledScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildMiniStat('5', 'Members', isDark),
-                          _buildMiniStat('₹ 8,540', 'You Paid', isDark),
-                          _buildMiniStat('₹ 6,490', 'Your Share', isDark),
-                          _buildMiniStat('₹ 2,050', 'You Received', isDark, isHighlight: true),
+                          _buildMiniStat('$membersCount', 'Members', isDark),
+                          _buildMiniStat('₹ ${youPaid.toStringAsFixed(0)}', 'You Paid', isDark),
+                          _buildMiniStat('₹ ${fairShare.toStringAsFixed(0)}', 'Your Share', isDark),
+                          _buildMiniStat('₹ ${youReceived.toStringAsFixed(0)}', 'Collected', isDark, isHighlight: true),
                         ],
                       ),
                     ),
@@ -206,7 +227,7 @@ class TripSettledScreen extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Final Status',
+                        'Member Accounts Balanced',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -225,7 +246,6 @@ class TripSettledScreen extends StatelessWidget {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (ctx, index) {
                         final item = membersStatus[index];
-                        final isPositive = item['isPositive'] as bool;
 
                         return TripSplitCard(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -233,7 +253,11 @@ class TripSettledScreen extends StatelessWidget {
                             children: [
                               CircleAvatar(
                                 radius: 18,
-                                backgroundImage: NetworkImage(item['avatar'] as String),
+                                backgroundColor: const Color(0xFF10B981).withOpacity(0.2),
+                                child: Text(
+                                  item['name'].toString().isNotEmpty ? item['name'].toString()[0].toUpperCase() : 'M',
+                                  style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -262,20 +286,20 @@ class TripSettledScreen extends StatelessWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(
-                                    item['status'] as String,
+                                  const Text(
+                                    '₹ 0',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,
-                                      color: isPositive ? AppColors.positiveText : AppColors.negativeText,
+                                      color: Color(0xFF10B981),
                                     ),
                                   ),
                                   Text(
                                     item['statusLabel'] as String,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: isPositive ? AppColors.positiveText : AppColors.negativeText,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF10B981),
                                     ),
                                   ),
                                 ],
@@ -295,7 +319,10 @@ class TripSettledScreen extends StatelessWidget {
                           child: TripSplitSecondaryButton(
                             label: 'View Trip',
                             icon: const Icon(Icons.remove_red_eye_outlined, size: 18, color: AppColors.primary),
-                            onPressed: () => Navigator.of(context).pushNamed('/dashboard'),
+                            onPressed: () => Navigator.of(context).pushNamed(
+                              '/dashboard',
+                              arguments: {'tripId': tripId},
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -328,7 +355,7 @@ class TripSettledScreen extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w800,
             color: isHighlight
-                ? AppColors.positiveText
+                ? const Color(0xFF10B981)
                 : (isDark ? AppColors.textDarkMain : AppColors.textLightMain),
           ),
         ),
