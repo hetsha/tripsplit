@@ -802,17 +802,48 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Add Expense CTA Button
-                      TripSplitButton(
-                        label: 'Add Expense',
-                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-                        onPressed: () async {
-                          await Navigator.of(context).pushNamed(
-                            '/add_expense',
-                            arguments: {'tripId': tripId},
-                          );
-                          _loadDashboard();
-                        },
+                      // Action Buttons: Add Expense & Scan Bill
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TripSplitButton(
+                              label: 'Add Expense',
+                              icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                              onPressed: () async {
+                                await Navigator.of(context).pushNamed(
+                                  '/add_expense',
+                                  arguments: {'tripId': tripId},
+                                );
+                                _loadDashboard();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.primary, width: 1.5),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(Icons.document_scanner_rounded, size: 20),
+                              label: const Text(
+                                'Scan Bill',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              onPressed: () async {
+                                await Navigator.of(context).pushNamed(
+                                  '/add_expense',
+                                  arguments: {'tripId': tripId, 'autoScan': true},
+                                );
+                                _loadDashboard();
+                              },
+                            ),
+                          ),
+                        ],
                       ),
 
                     const SizedBox(height: 10),

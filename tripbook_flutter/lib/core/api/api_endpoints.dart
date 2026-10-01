@@ -41,6 +41,7 @@ class ApiEndpoints {
   // Transactions & Expenses
   static const String transactions = 'transactions.php';
   static const String expenses = 'expenses.php';
+  static const String scanReceipt = 'scan_receipt.php';
   static const String addMoney = 'transactions.php?action=add_money';
 
   // Settlements

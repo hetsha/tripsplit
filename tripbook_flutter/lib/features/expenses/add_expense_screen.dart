@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tripsplit_widgets.dart';
@@ -28,6 +32,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   String _selectedPaymentMethod = 'upi'; // 'upi', 'cash', 'card', 'bank'
   bool _isSaving = false;
 
+  // Receipt OCR / AI Bill Scanning state
+  String? _receiptUrl;
+  String? _receiptLocalPath;
+  bool _isScanningReceipt = false;
+  static const MethodChannel _shareChannel = MethodChannel('com.tripbook.app/share');
+
   Map<String, dynamic>? _selectedTrip;
   List<Map<String, dynamic>> _activeTrips = [];
   bool _initialized = false;
@@ -41,6 +51,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     {'id': 'card', 'label': 'Card', 'icon': '💳'},
     {'id': 'bank', 'label': 'Bank Transfer', 'icon': '🏦'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSharedImage();
+  }
+
+  Future<void> _checkSharedImage() async {
+    try {
+      final String? sharedPath = await _shareChannel.invokeMethod<String>('getSharedImage');
+      if (sharedPath != null && sharedPath.isNotEmpty && mounted) {
+        _processReceiptFile(File(sharedPath));
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -87,6 +112,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
       _setupMembers();
       _initialized = true;
+
+      // Handle autoScan or shared image passed from previous screen
+      if (args?['autoScan'] == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showScanBillPicker();
+        });
+      } else if (args?['sharedImagePath'] != null) {
+        final path = args!['sharedImagePath'] as String;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _processReceiptFile(File(path));
+        });
+      }
     }
   }
 
@@ -330,6 +367,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         payers: payersList,
         tripId: tripId,
         notes: _noteController.text.trim(),
+        receiptUrl: _receiptUrl,
       );
 
       if (mounted) {
@@ -409,6 +447,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     ],
 
                     const SizedBox(height: 16),
+
+                    // Bill / Receipt Scanner Card
+                    _buildScanBillCard(isDark),
 
                     Text(
                       'Expense Details',
@@ -2171,6 +2212,711 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildScanBillCard(bool isDark) {
+    if (_isScanningReceipt) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Reading Bill with AI...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Extracting merchant, items, date & amount',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_receiptLocalPath != null || _receiptUrl != null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.elevatedDark : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withOpacity(0.35)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _receiptLocalPath != null
+                  ? Image.file(
+                      File(_receiptLocalPath!),
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      width: 50,
+                      height: 50,
+                      color: AppColors.primary.withOpacity(0.12),
+                      child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: AppColors.positive, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Bill Attached & Read',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _titleController.text.isNotEmpty ? _titleController.text : 'Receipt ready to split',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+              tooltip: 'Remove Receipt',
+              onPressed: () {
+                setState(() {
+                  _receiptLocalPath = null;
+                  _receiptUrl = null;
+                });
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+        ),
+      ),
+      child: InkWell(
+        onTap: _showScanBillPicker,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: AppColors.brandGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.document_scanner_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Scan or Share Bill',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'AI OCR',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Snap photo or share receipt to auto-read & split',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showScanBillPicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Add Bill / Receipt',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'TripBook reads the total, merchant & items to split in this trip',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+                ),
+                title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Click photo of physical paper bill or receipt'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () => _pickImage(ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Colors.purple),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Pick screenshot, PDF invoice image, or saved bill'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () => _pickImage(ImageSource.gallery),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
+                ),
+                title: const Text('Test with Demo Bill', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Simulate AI scanning with a sample restaurant bill'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: _scanDemoReceipt,
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.share_rounded, size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tip: Share a bill image directly from WhatsApp or Gallery into TripBook to auto-read & split!',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    Navigator.of(context).pop();
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        await _processReceiptFile(File(pickedFile.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not access image picker: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _processReceiptFile(File file) async {
+    setState(() {
+      _isScanningReceipt = true;
+      _receiptLocalPath = file.path;
+    });
+
+    try {
+      final bytes = await file.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      final expenseService = Provider.of<ExpenseService>(context, listen: false);
+      final tripId = _selectedTrip?['id'] as int?;
+
+      final result = await expenseService.scanReceipt(
+        imageBase64: base64Image,
+        tripId: tripId,
+      );
+
+      if (result != null && result['data'] != null && mounted) {
+        final data = Map<String, dynamic>.from(result['data']);
+        final receiptUrl = result['receipt_url'] as String?;
+        _showReceiptReviewSheet(data, receiptUrl, file.path);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not extract details automatically. You can enter them manually.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Receipt scan failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanningReceipt = false);
+      }
+    }
+  }
+
+  Future<void> _scanDemoReceipt() async {
+    Navigator.of(context).pop();
+    setState(() => _isScanningReceipt = true);
+    try {
+      final expenseService = Provider.of<ExpenseService>(context, listen: false);
+      final tripId = _selectedTrip?['id'] as int?;
+
+      final result = await expenseService.scanReceipt(
+        isDemo: true,
+        tripId: tripId,
+      );
+
+      if (result != null && result['data'] != null && mounted) {
+        final data = Map<String, dynamic>.from(result['data']);
+        _showReceiptReviewSheet(data, result['receipt_url'] as String?, null);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scan failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanningReceipt = false);
+      }
+    }
+  }
+
+  void _showReceiptReviewSheet(Map<String, dynamic> data, String? receiptUrl, String? localPath) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleController = TextEditingController(text: data['title']?.toString() ?? 'Bill Expense');
+    final amountController = TextEditingController(text: (data['amount'] ?? 0.0).toString());
+    final items = (data['items'] is List) ? List<Map<String, dynamic>>.from(data['items']) : <Map<String, dynamic>>[];
+    final categoryName = data['category_name']?.toString() ?? 'Food & Dining';
+    final rawDate = data['date']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.positive.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.auto_awesome, color: AppColors.positive, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Bill Read Successfully',
+                            style: TextStyle(
+                              color: AppColors.positive,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (localPath != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(localPath),
+                      height: 130,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                Text(
+                  'Merchant / Title',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Starbucks, Shell',
+                    filled: true,
+                    fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Total Amount (₹)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    prefixText: '₹ ',
+                    filled: true,
+                    fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Category', style: TextStyle(fontSize: 11, color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
+                            const SizedBox(height: 2),
+                            Text(categoryName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Date', style: TextStyle(fontSize: 11, color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
+                            const SizedBox(height: 2),
+                            Text(rawDate.isNotEmpty ? rawDate : _formatDate(DateTime.now()), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (items.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Detected Line Items (${items.length})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 8),
+                      itemBuilder: (context, idx) {
+                        final itm = items[idx];
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                itm['name']?.toString() ?? 'Item',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            Text(
+                              '₹${itm['price']?.toString() ?? '0'}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                TripSplitButton(
+                  label: 'Apply & Split in Trip 🚀',
+                  onPressed: () {
+                    final parsedAmt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                    final parsedTitle = titleController.text.trim();
+
+                    setState(() {
+                      _titleController.text = parsedTitle.isNotEmpty ? parsedTitle : 'Bill Expense';
+                      _amountController.text = parsedAmt > 0 ? parsedAmt.toStringAsFixed(2) : amountController.text;
+                      _receiptUrl = receiptUrl;
+                      _receiptLocalPath = localPath;
+
+                      // Match category if available
+                      final expense = Provider.of<ExpenseService>(context, listen: false);
+                      final matched = expense.categories.firstWhere(
+                        (c) => (c['name'] as String).toLowerCase().contains(categoryName.toLowerCase()),
+                        orElse: () => {},
+                      );
+                      if (matched.isNotEmpty) {
+                        _selectedCategoryId = matched['id'] as int?;
+                        _selectedCategoryName = matched['name'] as String;
+                      }
+
+                      // Parse date
+                      if (rawDate.isNotEmpty) {
+                        try {
+                          _expenseDate = DateTime.parse(rawDate);
+                        } catch (_) {}
+                      }
+
+                      // Append note with items if available
+                      if (items.isNotEmpty) {
+                        final itemSummary = items.map((i) => '${i['name']} (₹${i['price']})').join(', ');
+                        _noteController.text = 'Items: $itemSummary';
+                      }
+
+                      // Recalculate group splits with the new total!
+                      _recalculateSplits();
+                      if (_isMultiplePayers) {
+                        _recalculateEqualPayers();
+                      }
+                    });
+
+                    Navigator.of(ctx).pop();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Bill applied! ₹${parsedAmt.toStringAsFixed(2)} ready to split.'),
+                        backgroundColor: AppColors.positive,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

@@ -16,6 +16,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $currentUser = getCurrentUser();
 $db = getDBConnection();
+ensureReceiptColumns();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? $_POST['action'] ?? 'get';
 
@@ -118,6 +119,7 @@ if ($method === 'POST') {
         $paymentMethod = validatePaymentMethod($input['payment_method'] ?? 'cash');
         $txDate = !empty($input['transaction_date']) ? date('Y-m-d H:i:s', strtotime($input['transaction_date'])) : date('Y-m-d H:i:s');
         $notes = trim((string)($input['notes'] ?? ''));
+        $receiptUrl = !empty($input['receipt_url']) ? trim((string)$input['receipt_url']) : null;
         $rawSplits = $input['splits'] ?? [];
         $requestId = trim((string)($input['client_request_id'] ?? ''));
 
@@ -178,8 +180,8 @@ if ($method === 'POST') {
         $db->beginTransaction();
         try {
             $stmt = $db->prepare("
-                INSERT INTO transactions (trip_id, type, amount, description, category_id, paid_by, payment_method, paid_from_pool, created_by, transaction_date, notes)
-                VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO transactions (trip_id, type, amount, description, category_id, paid_by, payment_method, paid_from_pool, created_by, transaction_date, notes, receipt_url)
+                VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $paidFromPool = !empty($input['paid_from_pool']) ? 1 : 0;
             $stmt->execute([
@@ -192,9 +194,16 @@ if ($method === 'POST') {
                 $paidFromPool,
                 $currentUser['id'],
                 $txDate,
-                $notes ?: null
+                $notes ?: null,
+                $receiptUrl
             ]);
             $transactionId = (int)$db->lastInsertId();
+
+            if (!empty($receiptUrl)) {
+                try {
+                    $db->prepare("UPDATE receipts SET transaction_id = ? WHERE image_url = ?")->execute([$transactionId, $receiptUrl]);
+                } catch (Throwable $e) {}
+            }
 
             // Insert splits only for shared expenses
             if (!$isPersonal && !empty($normalizedSplits)) {
@@ -287,11 +296,14 @@ if ($method === 'POST') {
         $finalTripId = $isPersonal ? null : $tripId;
         $normalizedSplits = $isPersonal ? [] : validateAndNormalizeSplits($amount, $rawSplits);
 
+        $receiptUrl = !empty($input['receipt_url']) ? trim((string)$input['receipt_url']) : null;
+
         $db->beginTransaction();
         try {
             $stmt = $db->prepare("
                 UPDATE transactions 
-                SET trip_id = ?, amount = ?, description = ?, category_id = ?, paid_by = ?, payment_method = ?, paid_from_pool = ?, transaction_date = ?, notes = ?
+                SET trip_id = ?, amount = ?, description = ?, category_id = ?, paid_by = ?, payment_method = ?, paid_from_pool = ?, transaction_date = ?, notes = ?,
+                    receipt_url = COALESCE(?, receipt_url)
                 WHERE id = ? AND type = 'expense' AND created_by = ?
             ");
             $paidFromPool = ($isPersonal) ? 0 : 1;
@@ -305,6 +317,7 @@ if ($method === 'POST') {
                 $paidFromPool,
                 $txDate,
                 $notes ?: null,
+                $receiptUrl,
                 $expenseId,
                 $currentUser['id']
             ]);

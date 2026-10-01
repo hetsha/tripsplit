@@ -73,6 +73,32 @@ class ExpenseService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // Scan & Read Receipt via AI / OCR
+  Future<Map<String, dynamic>?> scanReceipt({
+    String? imageBase64,
+    bool isDemo = false,
+    int? tripId,
+  }) async {
+    try {
+      final payload = {
+        if (imageBase64 != null) 'image_base64': imageBase64,
+        if (isDemo) 'is_demo': true,
+        if (tripId != null) 'trip_id': tripId,
+      };
+      final res = await _apiClient.post(ApiEndpoints.scanReceipt, payload);
+      if (res['success'] == true && res['data'] != null) {
+        return {
+          'receipt_url': res['receipt_url'],
+          'receipt_id': res['receipt_id'],
+          'data': res['data'],
+        };
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Add/Save Expense (both shared and personal)
   Future<void> saveExpense({
     required double amount,
@@ -86,6 +112,7 @@ class ExpenseService extends ChangeNotifier {
     List<Map<String, dynamic>>? payers,
     int? tripId,
     String? notes,
+    String? receiptUrl,
     int? expenseId,
   }) async {
     final payload = {
@@ -102,6 +129,7 @@ class ExpenseService extends ChangeNotifier {
       'splits': splits,
       if (payers != null && payers.isNotEmpty) 'payers': payers,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (receiptUrl != null && receiptUrl.isNotEmpty) 'receipt_url': receiptUrl,
     };
 
     try {

@@ -114,6 +114,10 @@ class _HomeCoordinatorState extends State<HomeCoordinator> with WidgetsBindingOb
                   Navigator.pop(ctx);
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const AddExpenseScreen()));
                 }),
+                _buildFABOption(context, Icons.document_scanner_rounded, 'Scan Bill', const [Color(0xFFEC4899), Color(0xFFF43F5E)], () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AddExpenseScreen(), settings: const RouteSettings(arguments: {'autoScan': true})));
+                }),
                 _buildFABOption(context, Icons.account_balance_wallet_rounded, 'Add Money', const [Color(0xFF10B981), Color(0xFF06B6D4)], () {
                   Navigator.pop(ctx);
                   _showAddMoneyDialog(context);

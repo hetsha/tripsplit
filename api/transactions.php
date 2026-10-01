@@ -31,7 +31,7 @@ if ($method === 'GET') {
     $sql = "
         SELECT 
             t.id, t.type, t.trip_id, t.amount, t.description, t.payment_method, 
-            t.transaction_date, t.notes, t.created_at, t.created_by,
+            t.transaction_date, t.notes, t.receipt_url, t.created_at, t.created_by,
             c.id as category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
             u.id as payer_id, u.name as payer_name, u.avatar_color as payer_color,
             r.id as receiver_id, r.name as receiver_name, r.avatar_color as receiver_color

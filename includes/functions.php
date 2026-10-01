@@ -126,6 +126,40 @@ function ensureTransactionPayersTable(): void {
 }
 
 /**
+ * Ensure receipts table and receipt_url column exist in transactions.
+ */
+function ensureReceiptColumns(): void {
+    static $ensured = false;
+    if ($ensured) return;
+    try {
+        $db = getDBConnection();
+        $colCheck = $db->query("SHOW COLUMNS FROM `transactions` LIKE 'receipt_url'")->fetch();
+        if (!$colCheck) {
+            $db->exec("ALTER TABLE `transactions` ADD COLUMN `receipt_url` VARCHAR(500) NULL AFTER `notes`");
+        }
+
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS `receipts` (
+                `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `transaction_id` INT UNSIGNED NULL,
+                `user_id` INT UNSIGNED NOT NULL,
+                `image_url` VARCHAR(500) NOT NULL,
+                `file_path` VARCHAR(500) NOT NULL,
+                `raw_text` MEDIUMTEXT NULL,
+                `parsed_data` JSON NULL,
+                `confidence` DECIMAL(3,2) NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (`transaction_id`),
+                INDEX (`user_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+        $ensured = true;
+    } catch (Throwable $e) {
+        $ensured = true;
+    }
+}
+
+/**
  * Compute and attach individual user lent/owe position for a transaction.
  */
 function attachUserTransactionPosition(array &$tx, int $currentUserId, string $currencySymbol = '₹'): void {

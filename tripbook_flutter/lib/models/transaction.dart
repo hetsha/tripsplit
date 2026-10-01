@@ -50,6 +50,7 @@ class Transaction {
   final List<TransactionSplit> splits;
   final List<TransactionSplit> payers;
   final bool isMultiPayer;
+  final String? receiptUrl;
   final String? userStatus; // 'lent', 'owe', 'paid', 'none', 'settled_paid', 'settled_received'
   final String? userStatusLabel; // 'You lent', 'You owe', etc.
   final double? userNet;
@@ -67,6 +68,7 @@ class Transaction {
     required this.formattedAmount,
     required this.formattedDate,
     this.notes,
+    this.receiptUrl,
     this.categoryName,
     this.categoryIcon,
     this.categoryColor,
@@ -108,6 +110,7 @@ class Transaction {
       formattedAmount: json['formatted_amount'] ?? '',
       formattedDate: json['formatted_date'] ?? '',
       notes: json['notes'],
+      receiptUrl: json['receipt_url'],
       categoryName: json['category_name'],
       categoryIcon: json['category_icon'],
       categoryColor: json['category_color'],
