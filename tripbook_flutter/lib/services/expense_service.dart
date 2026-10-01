@@ -83,6 +83,7 @@ class ExpenseService extends ChangeNotifier {
     required bool isPersonal,
     required String clientRequestId,
     required List<Map<String, dynamic>> splits,
+    List<Map<String, dynamic>>? payers,
     int? tripId,
     String? notes,
     int? expenseId,
@@ -99,6 +100,7 @@ class ExpenseService extends ChangeNotifier {
       if (tripId != null && !isPersonal) 'trip_id': tripId,
       'client_request_id': clientRequestId,
       'splits': splits,
+      if (payers != null && payers.isNotEmpty) 'payers': payers,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     };
 

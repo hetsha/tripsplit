@@ -37,6 +37,53 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
+  Future<void> _handleCreateTrip() async {
+    if (_isSubmitting) return;
+    final name = _tripNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a trip name')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final memberNames = _members
+          .map((m) => m['name'] ?? '')
+          .where((n) => n.trim().isNotEmpty && !n.startsWith('You'))
+          .toList();
+      final dest = _destinationController.text.trim();
+
+      await auth.createTrip(
+        name: name,
+        description: dest.isNotEmpty ? dest : null,
+        members: memberNames,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Trip "$name" created successfully!'),
+          backgroundColor: AppColors.positive,
+        ),
+      );
+      Navigator.of(context).pushReplacementNamed('/home');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot connect: $e'),
+          backgroundColor: AppColors.negative,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   void _addMemberDialog() {
     final nameCtrl = TextEditingController();
     showDialog(
@@ -338,62 +385,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                     const SizedBox(height: 32),
 
                     // Create Trip Button with DB Persistence
-                    _isSubmitting
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        : TripSplitButton(
-                            label: 'Create Trip',
-                            trailingIcon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                            onPressed: () async {
-                              final name = _tripNameController.text.trim();
-                              if (name.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter a trip name')),
-                                );
-                                return;
-                              }
-
-                              setState(() => _isSubmitting = true);
-                              try {
-                                final auth = Provider.of<AuthService>(context, listen: false);
-                                final memberNames = _members
-                                    .map((m) => m['name'] ?? '')
-                                    .where((n) => n.trim().isNotEmpty && !n.startsWith('You'))
-                                    .toList();
-                                final dest = _destinationController.text.trim();
-
-                                await auth.createTrip(
-                                  name: name,
-                                  description: dest.isNotEmpty ? dest : null,
-                                  members: memberNames,
-                                );
-
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Trip "$name" created successfully!'),
-                                    backgroundColor: AppColors.positive,
-                                  ),
-                                );
-                                Navigator.of(context).pushReplacementNamed('/home');
-                              } catch (e) {
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Cannot connect: $e'),
-                                    backgroundColor: AppColors.negative,
-                                    duration: const Duration(seconds: 4),
-                                  ),
-                                );
-                              } finally {
-                                if (mounted) setState(() => _isSubmitting = false);
-                              }
-                            },
-                          ),
+                    TripSplitButton(
+                      label: 'Create Trip',
+                      isLoading: _isSubmitting,
+                      trailingIcon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                      onPressed: _isSubmitting ? null : _handleCreateTrip,
+                    ),
                     const SizedBox(height: 24),
                   ],
                 ),

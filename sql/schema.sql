@@ -124,6 +124,19 @@ CREATE TABLE `expense_splits` (
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 7b. Transaction Payers Table (For multi-payer expenses)
+CREATE TABLE IF NOT EXISTS `transaction_payers` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `transaction_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
+    `amount` DECIMAL(12,2) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `unique_payer_split` (`transaction_id`, `user_id`),
+    FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- 8. Settlements Table (Tracks person-to-person debt clearance)
 CREATE TABLE `settlements` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

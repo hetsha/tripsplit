@@ -48,6 +48,12 @@ class Transaction {
   final int? receiverId;
   final String? receiverName;
   final List<TransactionSplit> splits;
+  final List<TransactionSplit> payers;
+  final bool isMultiPayer;
+  final String? userStatus; // 'lent', 'owe', 'paid', 'none', 'settled_paid', 'settled_received'
+  final String? userStatusLabel; // 'You lent', 'You owe', etc.
+  final double? userNet;
+  final String? formattedUserAmount;
 
   Transaction({
     required this.id,
@@ -71,12 +77,23 @@ class Transaction {
     this.receiverId,
     this.receiverName,
     required this.splits,
+    this.payers = const [],
+    this.isMultiPayer = false,
+    this.userStatus,
+    this.userStatusLabel,
+    this.userNet,
+    this.formattedUserAmount,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     var rawSplits = json['splits'] as List?;
     List<TransactionSplit> parsedSplits = rawSplits != null
         ? rawSplits.map((s) => TransactionSplit.fromJson(s)).toList()
+        : [];
+
+    var rawPayers = json['payers'] as List?;
+    List<TransactionSplit> parsedPayers = rawPayers != null
+        ? rawPayers.map((p) => TransactionSplit.fromJson(p)).toList()
         : [];
 
     return Transaction(
@@ -107,6 +124,12 @@ class Transaction {
           : null,
       receiverName: json['receiver_name'],
       splits: parsedSplits,
+      payers: parsedPayers,
+      isMultiPayer: json['is_multi_payer'] == true || parsedPayers.length > 1,
+      userStatus: json['user_status'],
+      userStatusLabel: json['user_status_label'],
+      userNet: json['user_net'] != null ? double.tryParse(json['user_net'].toString()) : null,
+      formattedUserAmount: json['formatted_user_amount'],
     );
   }
 }

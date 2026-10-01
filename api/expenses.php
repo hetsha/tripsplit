@@ -141,6 +141,29 @@ if ($method === 'POST') {
             $normalizedSplits = validateAndNormalizeSplits($amount, $rawSplits);
         }
 
+        // Multi-payer validation & normalization
+        $rawPayers = $input['payers'] ?? [];
+        $normalizedPayers = [];
+        if (!empty($rawPayers) && is_array($rawPayers)) {
+            $payerSum = 0.0;
+            foreach ($rawPayers as $p) {
+                $pUid = (int)($p['user_id'] ?? 0);
+                $pAmt = (float)($p['amount'] ?? 0.0);
+                if ($pUid > 0 && $pAmt > 0) {
+                    $normalizedPayers[$pUid] = $pAmt;
+                    $payerSum += $pAmt;
+                }
+            }
+            if (!empty($normalizedPayers)) {
+                if (abs($payerSum - $amount) > 0.05) {
+                    jsonError("Sum of payer amounts (" . formatMoney($payerSum) . ") must match total expense (" . formatMoney($amount) . ").", 422);
+                }
+                // Set paid_by to the highest payer for backward compatibility
+                arsort($normalizedPayers);
+                $paidBy = (int)array_key_first($normalizedPayers);
+            }
+        }
+
         // Check if category exists
         if ($categoryId > 0) {
             $catStmt = $db->prepare("SELECT id FROM categories WHERE id = ?");
@@ -178,6 +201,15 @@ if ($method === 'POST') {
                 $splitStmt = $db->prepare("INSERT INTO expense_splits (transaction_id, user_id, amount) VALUES (?, ?, ?)");
                 foreach ($normalizedSplits as $userId => $splitAmount) {
                     $splitStmt->execute([$transactionId, $userId, $splitAmount]);
+                }
+            }
+
+            // Insert multi-payers if provided
+            if (!empty($normalizedPayers)) {
+                ensureTransactionPayersTable();
+                $payerStmt = $db->prepare("INSERT INTO transaction_payers (transaction_id, user_id, amount) VALUES (?, ?, ?)");
+                foreach ($normalizedPayers as $pUid => $pAmt) {
+                    $payerStmt->execute([$transactionId, $pUid, $pAmt]);
                 }
             }
 
@@ -222,6 +254,28 @@ if ($method === 'POST') {
         $notes = trim((string)($input['notes'] ?? ''));
         $rawSplits = $input['splits'] ?? [];
 
+        // Multi-payer validation & normalization
+        $rawPayers = $input['payers'] ?? [];
+        $normalizedPayers = [];
+        if (!empty($rawPayers) && is_array($rawPayers)) {
+            $payerSum = 0.0;
+            foreach ($rawPayers as $p) {
+                $pUid = (int)($p['user_id'] ?? 0);
+                $pAmt = (float)($p['amount'] ?? 0.0);
+                if ($pUid > 0 && $pAmt > 0) {
+                    $normalizedPayers[$pUid] = $pAmt;
+                    $payerSum += $pAmt;
+                }
+            }
+            if (!empty($normalizedPayers)) {
+                if (abs($payerSum - $amount) > 0.05) {
+                    jsonError("Sum of payer amounts (" . formatMoney($payerSum) . ") must match total expense (" . formatMoney($amount) . ").", 422);
+                }
+                arsort($normalizedPayers);
+                $paidBy = (int)array_key_first($normalizedPayers);
+            }
+        }
+
         if ($expenseId <= 0) {
             jsonError('Invalid expense ID', 422);
         }
@@ -263,6 +317,18 @@ if ($method === 'POST') {
                 $splitStmt = $db->prepare("INSERT INTO expense_splits (transaction_id, user_id, amount) VALUES (?, ?, ?)");
                 foreach ($normalizedSplits as $userId => $splitAmount) {
                     $splitStmt->execute([$expenseId, $userId, $splitAmount]);
+                }
+            }
+
+            // Re-create payers
+            ensureTransactionPayersTable();
+            $delPayerStmt = $db->prepare("DELETE FROM transaction_payers WHERE transaction_id = ?");
+            $delPayerStmt->execute([$expenseId]);
+
+            if (!empty($normalizedPayers)) {
+                $payerStmt = $db->prepare("INSERT INTO transaction_payers (transaction_id, user_id, amount) VALUES (?, ?, ?)");
+                foreach ($normalizedPayers as $pUid => $pAmt) {
+                    $payerStmt->execute([$expenseId, $pUid, $pAmt]);
                 }
             }
 

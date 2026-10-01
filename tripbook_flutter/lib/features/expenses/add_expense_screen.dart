@@ -22,6 +22,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   DateTime _expenseDate = DateTime.now();
   int? _paidByUserId;
   String _paidByName = 'You';
+  bool _isMultiplePayers = false;
+  List<Map<String, dynamic>> _payerMembers = [];
   bool _splitEqually = true;
   String _selectedPaymentMethod = 'upi'; // 'upi', 'cash', 'card', 'bank'
   bool _isSaving = false;
@@ -39,6 +41,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     {'id': 'card', 'label': 'Card', 'icon': '💳'},
     {'id': 'bank', 'label': 'Bank Transfer', 'icon': '🏦'},
   ];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _noteController.dispose();
+    for (final p in _payerMembers) {
+      (p['controller'] as TextEditingController?)?.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -118,6 +131,20 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       };
     }).toList();
 
+    _payerMembers = rawMembers.map((m) {
+      final uid = m['id'] ?? m['user_id'] ?? 0;
+      final isCurrent = currentUser != null && uid == currentUser.id;
+      final mName = isCurrent ? 'You (${m['name']})' : (m['name'] ?? 'Member');
+
+      return {
+        'user_id': uid,
+        'name': mName,
+        'avatar_color': m['avatar_color'] ?? '#3b82f6',
+        'amount': 0.0,
+        'controller': TextEditingController(text: '0'),
+      };
+    }).toList();
+
     // Default payer
     if (currentUser != null) {
       _paidByUserId = currentUser.id;
@@ -128,6 +155,37 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
 
     _recalculateEqualSplit();
+  }
+
+  double _getPayersTotal() {
+    double sum = 0.0;
+    for (final p in _payerMembers) {
+      sum += (p['amount'] as double? ?? 0.0);
+    }
+    return sum;
+  }
+
+  void _recalculateEqualPayers() {
+    final total = _getExpenseTotal();
+    if (_payerMembers.isNotEmpty && total > 0) {
+      final perPerson = total / _payerMembers.length;
+      double accumulated = 0.0;
+
+      for (int i = 0; i < _payerMembers.length; i++) {
+        if (i == _payerMembers.length - 1) {
+          final lastAmt = double.parse((total - accumulated).toStringAsFixed(2));
+          _payerMembers[i]['amount'] = lastAmt;
+          final ctrl = _payerMembers[i]['controller'] as TextEditingController?;
+          ctrl?.text = lastAmt % 1 == 0 ? lastAmt.toInt().toString() : lastAmt.toStringAsFixed(2);
+        } else {
+          final rounded = double.parse(perPerson.toStringAsFixed(2));
+          _payerMembers[i]['amount'] = rounded;
+          final ctrl = _payerMembers[i]['controller'] as TextEditingController?;
+          ctrl?.text = rounded % 1 == 0 ? rounded.toInt().toString() : rounded.toStringAsFixed(2);
+          accumulated += rounded;
+        }
+      }
+    }
   }
 
   double _getExpenseTotal() {
@@ -213,6 +271,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           return;
         }
       }
+
+      if (_isMultiplePayers) {
+        final payersTotal = _getPayersTotal();
+        if ((total - payersTotal).abs() > 0.05) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payer amounts must equal total bill (₹ $total). Currently: ₹ $payersTotal')),
+          );
+          return;
+        }
+      }
     }
 
     setState(() => _isSaving = true);
@@ -232,6 +300,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   })
               .toList();
 
+      List<Map<String, dynamic>>? payersList;
+      int effectivePaidBy = _paidByUserId ?? auth.currentUser?.id ?? 0;
+
+      if (!isPersonal && _isMultiplePayers) {
+        final activePayers = _payerMembers.where((p) => (p['amount'] as double? ?? 0.0) > 0).toList();
+        if (activePayers.isNotEmpty) {
+          payersList = activePayers.map((p) => {
+            'user_id': p['user_id'],
+            'amount': p['amount'],
+          }).toList();
+          activePayers.sort((a, b) => ((b['amount'] as double)).compareTo(a['amount'] as double));
+          effectivePaidBy = activePayers.first['user_id'] as int;
+        }
+      }
+
       final categoryId = _selectedCategoryId ??
           (expense.categories.isNotEmpty ? expense.categories.first['id'] as int : 1);
 
@@ -239,11 +322,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         amount: total,
         description: title,
         categoryId: categoryId,
-        paidBy: _paidByUserId ?? auth.currentUser?.id ?? 0,
+        paidBy: effectivePaidBy,
         paymentMethod: _selectedPaymentMethod,
         isPersonal: isPersonal,
         clientRequestId: DateTime.now().millisecondsSinceEpoch.toString(),
         splits: splits,
+        payers: payersList,
         tripId: tripId,
         notes: _noteController.text.trim(),
       );
@@ -670,16 +754,20 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                       children: [
                                         CircleAvatar(
                                           radius: 12,
-                                          backgroundColor: AppColors.primary,
-                                          child: Text(
-                                            _paidByName.isNotEmpty ? _paidByName[0].toUpperCase() : 'P',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                          ),
+                                          backgroundColor: _isMultiplePayers ? const Color(0xFF8B5CF6) : AppColors.primary,
+                                          child: _isMultiplePayers
+                                              ? const Icon(Icons.groups_rounded, size: 13, color: Colors.white)
+                                              : Text(
+                                                  _paidByName.isNotEmpty ? _paidByName[0].toUpperCase() : 'P',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                                ),
                                         ),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            _paidByName,
+                                            _isMultiplePayers
+                                                ? 'Multiple (${_payerMembers.where((p) => (p['amount'] as double? ?? 0) > 0).length} people)'
+                                                : _paidByName,
                                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -1219,114 +1307,491 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
   }
 
-  // Who Paid Picker Modal Sheet
+  // Who Paid Picker Modal Sheet (Supports Single Payer & Multiple Payers)
   void _showPaidByPicker(BuildContext context, bool isDark) {
+    int selectedTab = _isMultiplePayers ? 1 : 0; // 0 = Single Payer, 1 = Multiple Payers
+    final total = _getExpenseTotal();
+
+    // If multi-payer was not set yet, initialize current payer with total
+    if (!_isMultiplePayers && total > 0) {
+      for (final p in _payerMembers) {
+        if (p['user_id'] == _paidByUserId) {
+          p['amount'] = total;
+          (p['controller'] as TextEditingController).text = total % 1 == 0 ? total.toInt().toString() : total.toStringAsFixed(2);
+        } else {
+          p['amount'] = 0.0;
+          (p['controller'] as TextEditingController).text = '0';
+        }
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF111726) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(
-              color: isDark ? const Color(0xFF222F43) : const Color(0xFFE2E8F0),
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).padding.bottom + 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            double currentPayersTotal = 0.0;
+            for (final p in _payerMembers) {
+              currentPayersTotal += (p['amount'] as double? ?? 0.0);
+            }
+            final double diff = total - currentPayersTotal;
+            final bool isMatch = (diff).abs() < 0.05 && total > 0;
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(modalCtx).size.height * 0.88,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF111726) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF222F43) : const Color(0xFFE2E8F0),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                MediaQuery.of(modalCtx).viewInsets.bottom + MediaQuery.of(modalCtx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Who paid for this?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ..._tripMembers.map((member) {
-                final isSelected = member['user_id'] == _paidByUserId;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _paidByUserId = member['user_id'] as int?;
-                        _paidByName = member['name'] as String;
-                      });
-                      Navigator.of(ctx).pop();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary.withOpacity(isDark ? 0.2 : 0.08)
-                            : (isDark ? const Color(0xFF172033) : const Color(0xFFF8FAFC)),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : (isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0)),
-                          width: isSelected ? 1.8 : 1.2,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Who paid for this?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: AppColors.primary,
-                            child: Text(
-                              member['name'].toString().isNotEmpty ? member['name'].toString()[0].toUpperCase() : 'M',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              member['name'] as String,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Mode Toggle (Single Payer vs Multiple Payers)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E283A) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                selectedTab = 0;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedTab == 0
+                                    ? (isDark ? const Color(0xFF2E3D56) : Colors.white)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: selectedTab == 0
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_rounded,
+                                    size: 15,
+                                    color: selectedTab == 0
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Single Payer',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: selectedTab == 0
+                                          ? AppColors.primary
+                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          if (isSelected)
-                            const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
-                          else
-                            const Icon(Icons.radio_button_unchecked_rounded, color: Colors.grey, size: 20),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                selectedTab = 1;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedTab == 1
+                                    ? (isDark ? const Color(0xFF2E3D56) : Colors.white)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: selectedTab == 1
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.groups_rounded,
+                                    size: 16,
+                                    color: selectedTab == 1
+                                        ? const Color(0xFF8B5CF6)
+                                        : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Multiple Payers',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: selectedTab == 1
+                                          ? const Color(0xFF8B5CF6)
+                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // TAB CONTENT
+                  if (selectedTab == 0) ...[
+                    // SINGLE PAYER LIST
+                    Expanded(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _tripMembers.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final member = _tripMembers[i];
+                          final isSelected = member['user_id'] == _paidByUserId && !_isMultiplePayers;
+
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isMultiplePayers = false;
+                                _paidByUserId = member['user_id'] as int?;
+                                _paidByName = member['name'] as String;
+                              });
+                              Navigator.of(ctx).pop();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primary.withOpacity(isDark ? 0.2 : 0.08)
+                                    : (isDark ? const Color(0xFF172033) : const Color(0xFFF8FAFC)),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : (isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0)),
+                                  width: isSelected ? 1.8 : 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppColors.primary,
+                                    child: Text(
+                                      member['name'].toString().isNotEmpty ? member['name'].toString()[0].toUpperCase() : 'M',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      member['name'] as String,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
+                                  else
+                                    const Icon(Icons.radio_button_unchecked_rounded, color: Colors.grey, size: 20),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ] else ...[
+                    // MULTIPLE PAYERS LIST & INPUTS
+                    // Allocation Status Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isMatch
+                            ? const Color(0xFF10B981).withOpacity(isDark ? 0.2 : 0.1)
+                            : (diff > 0.05
+                                ? const Color(0xFFF59E0B).withOpacity(isDark ? 0.2 : 0.1)
+                                : const Color(0xFFEF4444).withOpacity(isDark ? 0.2 : 0.1)),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isMatch
+                              ? const Color(0xFF10B981).withOpacity(0.4)
+                              : (diff > 0.05
+                                  ? const Color(0xFFF59E0B).withOpacity(0.4)
+                                  : const Color(0xFFEF4444).withOpacity(0.4)),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isMatch
+                                    ? '✓ Total bill fully paid'
+                                    : (diff > 0.05
+                                        ? '₹ ${diff.toStringAsFixed(diff % 1 == 0 ? 0 : 2)} remaining to pay'
+                                        : '₹ ${(-diff).toStringAsFixed((-diff) % 1 == 0 ? 0 : 2)} over bill amount'),
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isMatch
+                                      ? const Color(0xFF10B981)
+                                      : (diff > 0.05 ? const Color(0xFFD97706) : const Color(0xFFDC2626)),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Paid ₹ ${currentPayersTotal.toStringAsFixed(currentPayersTotal % 1 == 0 ? 0 : 2)} of ₹ ${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Split equally action
+                          GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                _recalculateEqualPayers();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF222F43) : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDark ? Colors.white12 : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.balance_rounded, size: 13, color: AppColors.primary),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Split 50/50',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
+
+                    const SizedBox(height: 12),
+
+                    Expanded(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _payerMembers.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final payer = _payerMembers[i];
+                          final ctrl = payer['controller'] as TextEditingController;
+                          final double paidAmt = payer['amount'] as double? ?? 0.0;
+                          final bool isActivelyPaying = paidAmt > 0.001;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isActivelyPaying
+                                  ? (isDark ? const Color(0xFF1E283A) : const Color(0xFFF8FAFC))
+                                  : (isDark ? const Color(0xFF131A29) : Colors.white),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isActivelyPaying
+                                    ? const Color(0xFF8B5CF6).withOpacity(0.5)
+                                    : (isDark ? const Color(0xFF222F43) : const Color(0xFFE2E8F0)),
+                                width: isActivelyPaying ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: isActivelyPaying ? const Color(0xFF8B5CF6) : Colors.grey,
+                                  child: Text(
+                                    payer['name'].toString().isNotEmpty ? payer['name'].toString()[0].toUpperCase() : 'M',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    payer['name'] as String,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  width: 110,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF131A29) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isActivelyPaying
+                                          ? const Color(0xFF8B5CF6)
+                                          : (isDark ? const Color(0xFF2E3D56) : const Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        '₹',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: ctrl,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                          ),
+                                          decoration: const InputDecoration(
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                            border: InputBorder.none,
+                                          ),
+                                          onChanged: (val) {
+                                            setModalState(() {
+                                              payer['amount'] = double.tryParse(val) ?? 0.0;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Confirm Payers Button
+                    TripSplitButton(
+                      label: isMatch
+                          ? 'Confirm Multiple Payers (₹ ${currentPayersTotal.toStringAsFixed(0)})'
+                          : 'Confirm Payers (${(diff > 0.05 ? '₹ ${diff.toStringAsFixed(0)} left' : 'Adjust amount')})',
+                      onPressed: () {
+                        if (!isMatch && total > 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Payer amounts must equal total bill (₹ ${total.toStringAsFixed(0)}). Currently: ₹ ${currentPayersTotal.toStringAsFixed(0)}'),
+                              backgroundColor: Colors.amber.shade800,
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          _isMultiplePayers = true;
+                          final activeCount = _payerMembers.where((p) => (p['amount'] as double? ?? 0) > 0).length;
+                          _paidByName = '$activeCount people';
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );

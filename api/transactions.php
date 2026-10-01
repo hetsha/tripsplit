@@ -90,7 +90,29 @@ if ($method === 'GET') {
             ");
             $sStmt->execute([$tx['id']]);
             $tx['splits'] = $sStmt->fetchAll();
+
+            ensureTransactionPayersTable();
+            $pStmt = $db->prepare("
+                SELECT tp.user_id, tp.amount, u.name, u.avatar_color
+                FROM transaction_payers tp
+                JOIN users u ON u.id = tp.user_id
+                WHERE tp.transaction_id = ?
+            ");
+            $pStmt->execute([$tx['id']]);
+            $tx['payers'] = $pStmt->fetchAll();
+            if (!empty($tx['payers']) && count($tx['payers']) > 1) {
+                $tx['is_multi_payer'] = true;
+                $tx['payer_name'] = count($tx['payers']) . ' people';
+            } else {
+                $tx['is_multi_payer'] = false;
+            }
+        } else {
+            $tx['splits'] = [];
+            $tx['payers'] = [];
+            $tx['is_multi_payer'] = false;
         }
+
+        attachUserTransactionPosition($tx, (int)$currentUser['id'], $membership['currency_symbol']);
     }
     unset($tx);
 

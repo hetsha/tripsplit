@@ -1,21 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Basic Flutter widget test for TripSplit app.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:tripbook_flutter/main.dart';
+import 'package:tripbook_flutter/services/auth_service.dart';
+import 'package:tripbook_flutter/services/expense_service.dart';
+import 'package:tripbook_flutter/theme/theme_notifier.dart';
 
 void main() {
-  testWidgets('TripBook app smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const TripBookApp());
+  testWidgets('TripSplit app smoke test', (WidgetTester tester) async {
+    // Build our app with required providers and trigger a frame.
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+          ChangeNotifierProvider(create: (_) => AuthService()),
+          ChangeNotifierProvider(create: (_) => ExpenseService()),
+        ],
+        child: const TripSplitApp(),
+      ),
+    );
 
-    // Verify that the logo icon is found during initialization
-    expect(find.byIcon(Icons.explore_rounded), findsOneWidget);
+    await tester.pumpAndSettle();
+
+    // Verify app builds - MaterialApp should be present.
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

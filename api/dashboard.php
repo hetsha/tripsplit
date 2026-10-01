@@ -46,16 +46,63 @@ $stmt = $db->prepare("
 $stmt->execute([$tripId]);
 $recentTransactions = $stmt->fetchAll();
 
-// Add payment method label & format
+// Attach splits and user position
+if (!empty($recentTransactions)) {
+    $txIds = array_column($recentTransactions, 'id');
+    $placeholders = implode(',', array_fill(0, count($txIds), '?'));
+    $splitStmt = $db->prepare("
+        SELECT es.transaction_id, es.user_id, es.amount, u.name, u.avatar_color
+        FROM expense_splits es
+        JOIN users u ON u.id = es.user_id
+        WHERE es.transaction_id IN ($placeholders)
+    ");
+    $splitStmt->execute($txIds);
+    $allSplits = $splitStmt->fetchAll();
+
+    $splitsByTx = [];
+    foreach ($allSplits as $s) {
+        $splitsByTx[(int)$s['transaction_id']][] = $s;
+    }
+
+    ensureTransactionPayersTable();
+    $payerStmt = $db->prepare("
+        SELECT tp.transaction_id, tp.user_id, tp.amount, u.name, u.avatar_color
+        FROM transaction_payers tp
+        JOIN users u ON u.id = tp.user_id
+        WHERE tp.transaction_id IN ($placeholders)
+    ");
+    $payerStmt->execute($txIds);
+    $allPayers = $payerStmt->fetchAll();
+
+    $payersByTx = [];
+    foreach ($allPayers as $p) {
+        $payersByTx[(int)$p['transaction_id']][] = $p;
+    }
+
+    $currentUserId = (int)$currentUser['id'];
+
     foreach ($recentTransactions as &$tx) {
+        $txId = (int)$tx['id'];
+        $tx['splits'] = $splitsByTx[$txId] ?? [];
+        $tx['payers'] = $payersByTx[$txId] ?? [];
+        if (!empty($tx['payers']) && count($tx['payers']) > 1) {
+            $tx['is_multi_payer'] = true;
+            $tx['payer_name'] = count($tx['payers']) . ' people';
+        } else {
+            $tx['is_multi_payer'] = false;
+        }
+
         $tx['expense_timing'] = 'during_trip';
         $meta = getPaymentMethodMeta($tx['payment_method'] ?? 'cash');
         $tx['payment_method_label'] = $meta['label'];
         $tx['payment_method_icon'] = $meta['icon'];
         $tx['formatted_amount'] = formatMoney($tx['amount'], $tripMoney['currency_symbol']);
         $tx['formatted_date'] = date('M d, g:i A', strtotime($tx['transaction_date']));
+
+        attachUserTransactionPosition($tx, $currentUserId, $tripMoney['currency_symbol']);
     }
-unset($tx);
+    unset($tx);
+}
 
 // Compute current user's individual position & cashbook ledger
 $myBalance = $memberBalances[(int)$currentUser['id']] ?? null;

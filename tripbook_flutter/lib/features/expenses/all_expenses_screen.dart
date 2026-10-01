@@ -636,7 +636,7 @@ class _AllExpensesScreenState extends State<AllExpensesScreen> {
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(
-                              '${isUser ? 'You' : (tx.payerName ?? 'Friend')} paid',
+                              '${isUser ? 'You' : (tx.payerName ?? 'Friend')} paid ₹${tx.amount.toStringAsFixed(0)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -669,28 +669,47 @@ class _AllExpensesScreenState extends State<AllExpensesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '₹ ${tx.amount.toStringAsFixed(0)}',
+                      userNet > 0.001
+                          ? '+₹ ${userNet.toStringAsFixed(0)}'
+                          : (userNet < -0.001
+                              ? '-₹ ${userNet.abs().toStringAsFixed(0)}'
+                              : (isUser ? '₹ ${tx.amount.toStringAsFixed(0)}' : '₹ 0')),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                        color: userNet > 0.001
+                            ? const Color(0xFF10B981)
+                            : (userNet < -0.001
+                                ? const Color(0xFFEF4444)
+                                : (isDark ? AppColors.textDarkMain : AppColors.textLightMain)),
                       ),
                     ),
                     const SizedBox(height: 3),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: (isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.12),
+                        color: (userNet > 0.001
+                                ? const Color(0xFF10B981)
+                                : (userNet < -0.001
+                                    ? const Color(0xFFEF4444)
+                                    : (isDark ? Colors.white10 : Colors.black12)))
+                            .withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        isPositive
-                            ? '+₹ ${userNet.toStringAsFixed(0)} lent'
-                            : '-₹ ${userNet.abs().toStringAsFixed(0)} owe',
+                        userNet > 0.001
+                            ? 'You lent'
+                            : (userNet < -0.001
+                                ? 'You owe'
+                                : (isUser ? 'You paid' : 'Not involved')),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          color: userNet > 0.001
+                              ? const Color(0xFF10B981)
+                              : (userNet < -0.001
+                                  ? const Color(0xFFEF4444)
+                                  : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
                         ),
                       ),
                     ),

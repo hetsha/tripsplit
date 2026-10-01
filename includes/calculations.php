@@ -206,17 +206,26 @@ function getSplitwiseBalances(int $tripId): array {
     $stmt->execute([$tripId]);
     $members = $stmt->fetchAll();
 
-    // Calculate Total Paid per user across ALL expenses
+    // Calculate Total Paid per user across ALL expenses (supports both single payer and multi-payer)
+    ensureTransactionPayersTable();
     $stmt = $db->prepare("
-        SELECT paid_by, COALESCE(SUM(amount), 0) as total_paid
-        FROM transactions
-        WHERE trip_id = ? AND type = 'expense' AND paid_by IS NOT NULL
-        GROUP BY paid_by
+        SELECT user_id, COALESCE(SUM(paid_amount), 0) as total_paid FROM (
+            SELECT tp.user_id, tp.amount as paid_amount
+            FROM transaction_payers tp
+            JOIN transactions t ON t.id = tp.transaction_id
+            WHERE t.trip_id = ? AND t.type = 'expense'
+            UNION ALL
+            SELECT t.paid_by as user_id, t.amount as paid_amount
+            FROM transactions t
+            WHERE t.trip_id = ? AND t.type = 'expense' AND t.paid_by IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM transaction_payers tp WHERE tp.transaction_id = t.id)
+        ) p
+        GROUP BY user_id
     ");
-    $stmt->execute([$tripId]);
+    $stmt->execute([$tripId, $tripId]);
     $paidMap = [];
     while ($row = $stmt->fetch()) {
-        $paidMap[(int)$row['paid_by']] = (float)$row['total_paid'];
+        $paidMap[(int)$row['user_id']] = (float)$row['total_paid'];
     }
 
     // Calculate Total Share benefited per user across ALL expense splits

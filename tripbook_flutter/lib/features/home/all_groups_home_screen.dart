@@ -95,11 +95,13 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               'dates': t['created_at'] != null ? t['created_at'].toString().split(' ').first : 'Active',
               'image': sampleCovers[coverIndex < 0 ? 0 : coverIndex],
               'membersCount': membersCount,
+              'spent': spent,
               'totalSpent': '₹ ${spent.toStringAsFixed(0)}',
               'totalBudget': '₹ ${budget.toStringAsFixed(0)}',
               'spentPercent': spentPercent,
               'netAmount': netAmount,
               'netLabel': netLabel,
+              'myNet': myNet,
               'isPositive': isPositive,
               'isSettled': isSettled,
               'category': 'Adventure',
@@ -115,9 +117,29 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
         : <Map<String, dynamic>>[];
 
     final stats = auth.tripStats;
-    final totalSpentNum = (stats['total_spent'] as num?)?.toDouble() ?? 0.0;
-    final toReceiveNum = (stats['total_to_receive'] as num?)?.toDouble() ?? 0.0;
-    final toPayNum = (stats['total_to_pay'] as num?)?.toDouble() ?? 0.0;
+
+    // Filter only ACTIVE (unsettled) trips for the payment card & active metrics
+    final activeGroups = allGroups.where((g) => !(g['isSettled'] as bool)).toList();
+    final double activeSpentNum = activeGroups.fold(0.0, (sum, g) => sum + ((g['spent'] as num?)?.toDouble() ?? 0.0));
+    final double activeToReceiveNum = activeGroups.fold(0.0, (sum, g) {
+      final net = (g['myNet'] as num?)?.toDouble() ?? 0.0;
+      return sum + (net > 0.01 ? net : 0.0);
+    });
+    final double activeToPayNum = activeGroups.fold(0.0, (sum, g) {
+      final net = (g['myNet'] as num?)?.toDouble() ?? 0.0;
+      return sum + (net < -0.01 ? net.abs() : 0.0);
+    });
+
+    // Settled trips are removed from the payment card balance and active spent
+    final totalSpentNum = allGroups.isNotEmpty
+        ? activeSpentNum
+        : ((stats['total_spent'] as num?)?.toDouble() ?? 0.0);
+    final toReceiveNum = allGroups.isNotEmpty
+        ? activeToReceiveNum
+        : ((stats['total_to_receive'] as num?)?.toDouble() ?? 0.0);
+    final toPayNum = allGroups.isNotEmpty
+        ? activeToPayNum
+        : ((stats['total_to_pay'] as num?)?.toDouble() ?? 0.0);
 
     final balanceStr = '₹ ${totalSpentNum.toStringAsFixed(0)}';
     final toReceiveStr = toReceiveNum > 0 ? '+₹ ${toReceiveNum.toStringAsFixed(0)}' : '+₹ 0';
@@ -875,21 +897,27 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Hello, $firstName',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                        letterSpacing: -0.3,
+                    Flexible(
+                      child: Text(
+                        'Hello, $firstName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                          letterSpacing: -0.3,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text('👋', style: TextStyle(fontSize: 15)),
+                    const Text('👋', style: TextStyle(fontSize: 14)),
                   ],
                 ),
                 Text(
                   '$activeCount Active Travel ${activeCount == 1 ? 'Group' : 'Groups'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -899,26 +927,19 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          // Screens Switcher Icon Button
           GestureDetector(
             onTap: () => TripSplitScreenNavigator.show(context),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withOpacity(0.25), width: 1),
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 1),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.dashboard_customize_rounded, size: 14, color: AppColors.primary),
-                  SizedBox(width: 4),
-                  Text(
-                    'Screens',
-                    style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                ],
-              ),
+              child: const Icon(Icons.grid_view_rounded, size: 17, color: AppColors.primary),
             ),
           ),
           const SizedBox(width: 8),
@@ -928,10 +949,11 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               Provider.of<ThemeNotifier>(context, listen: false).toggleTheme();
             },
             child: Container(
-              padding: const EdgeInsets.all(7),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF131A29) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                shape: BoxShape.circle,
                 border: Border.all(
                   color: isDark ? const Color(0xFF222F43) : const Color(0xFFE2E8F0),
                   width: 1,
@@ -944,10 +966,12 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
                   ),
                 ],
               ),
-              child: Icon(
-                isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                size: 15,
-                color: isDark ? const Color(0xFFFDE047) : const Color(0xFF6C38FF),
+              child: Center(
+                child: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  size: 16,
+                  color: isDark ? const Color(0xFFFDE047) : const Color(0xFF6C38FF),
+                ),
               ),
             ),
           ),

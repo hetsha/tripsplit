@@ -45,6 +45,7 @@ if ($method === 'GET') {
 
         $tripsList = [];
         $totalSpentAll = 0.0;
+        $activeSpentAll = 0.0;
         $totalToReceiveAll = 0.0;
         $totalToPayAll = 0.0;
         $connectedFriends = [];
@@ -80,12 +81,6 @@ if ($method === 'GET') {
             $balances = getSplitwiseBalances($tripId);
             $myNet = isset($balances[$userId]) ? (float)$balances[$userId]['net_balance'] : 0.0;
 
-            if ($myNet > 0.01) {
-                $totalToReceiveAll += $myNet;
-            } elseif ($myNet < -0.01) {
-                $totalToPayAll += abs($myNet);
-            }
-
             $isSettled = true;
             foreach ($balances as $b) {
                 if (abs((float)$b['net_balance']) > 0.01) {
@@ -98,6 +93,13 @@ if ($method === 'GET') {
                 $settledTripsCount++;
             } else {
                 $activeTripsCount++;
+                // Only active (unsettled) trips contribute to active vault spending and active balances:
+                $activeSpentAll += $totalSpent;
+                if ($myNet > 0.01) {
+                    $totalToReceiveAll += $myNet;
+                } elseif ($myNet < -0.01) {
+                    $totalToPayAll += abs($myNet);
+                }
             }
 
             $tripsList[] = [
@@ -126,7 +128,8 @@ if ($method === 'GET') {
                 'total_trips'      => count($tripsList),
                 'active_trips'     => $activeTripsCount,
                 'settled_trips'    => $settledTripsCount,
-                'total_spent'      => $totalSpentAll,
+                'total_spent'      => $activeSpentAll,
+                'all_time_spent'   => $totalSpentAll,
                 'total_to_receive' => $totalToReceiveAll,
                 'total_to_pay'     => $totalToPayAll,
                 'friends_count'    => count($connectedFriends),
@@ -202,6 +205,20 @@ if ($method === 'POST') {
 
         if (empty($name)) {
             jsonError('Trip name is required', 422);
+        }
+
+        // Dedupe: ignore double-tap / retry creating same trip within 15 sec
+        $dupStmt = $db->prepare("SELECT id, trip_code, url_token FROM trips WHERE created_by = ? AND name = ? AND created_at >= (NOW() - INTERVAL 15 SECOND) ORDER BY id DESC LIMIT 1");
+        $dupStmt->execute([$currentUser['id'], $name]);
+        $dup = $dupStmt->fetch();
+        if ($dup) {
+            setActiveTripId((int)$dup['id']);
+            jsonSuccess('Trip created successfully!', [
+                'trip_id'   => (int)$dup['id'],
+                'trip_code' => $dup['trip_code'],
+                'url_token' => $dup['url_token'],
+                'duplicate' => true
+            ]);
         }
 
         $tripCode = generateTripCode();

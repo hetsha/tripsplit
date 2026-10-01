@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
@@ -73,22 +72,114 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
     final tripTitle = tripInfo?['name'] ?? args?['trip']?['title'] ?? 'Trip Dashboard';
     final tripDest = args?['trip']?['destination'] ?? 'Goa, India';
     final currency = tripMoney?['currency_symbol'] ?? '₹';
-
     final totalSpentNum = (tripMoney?['total_spent'] as num?)?.toDouble() ?? 0.0;
-    final startingPool = (tripMoney?['starting_money'] as num?)?.toDouble() ?? 0.0;
-    final totalBudgetNum = startingPool > 0 ? startingPool : (totalSpentNum > 0 ? totalSpentNum * 1.25 : 0.0);
-    final remainingNum = max(0.0, totalBudgetNum - totalSpentNum);
-    final spentPercent = totalBudgetNum > 0 ? (totalSpentNum / totalBudgetNum).clamp(0.0, 1.0) : 0.0;
+    final expenseCount = (expenseSummary?['expense_count'] as num?)?.toInt()
+        ?? (expenseSummary?['total_count'] as num?)?.toInt()
+        ?? (expense.dashboardData?['recent_transactions'] as List?)?.length
+        ?? 0;
+
+    final int currentUserId = auth.currentUser?.id ?? 0;
+    final myBalance = expense.dashboardData?['my_balance'] as Map<String, dynamic>?;
+    final whoOwesWhom = expense.dashboardData?['who_owes_whom'] as List? ?? [];
+
+    // Payments I owe to other members
+    final paymentsIOwe = whoOwesWhom.where((s) {
+      final fId = s['from_user_id'] is int ? s['from_user_id'] : int.tryParse(s['from_user_id'].toString());
+      return fId != null && fId == currentUserId;
+    }).toList();
+    final double amountIOweFromSettlements = paymentsIOwe.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+    final int countIOwe = paymentsIOwe.length;
+
+    // Payments other members owe to me (I lent)
+    final paymentsILent = whoOwesWhom.where((s) {
+      final tId = s['to_user_id'] is int ? s['to_user_id'] : int.tryParse(s['to_user_id'].toString());
+      return tId != null && tId == currentUserId;
+    }).toList();
+    final double amountILentFromSettlements = paymentsILent.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+    final int countILent = paymentsILent.length;
+
+    // Authoritative Net balance fallback
+    final netBalance = (myBalance?['net_balance'] as num?)?.toDouble() ?? 0.0;
+    final double effectiveLent = amountILentFromSettlements > 0
+        ? amountILentFromSettlements
+        : (netBalance > 0 ? netBalance : 0.0);
+    final double effectiveOwe = amountIOweFromSettlements > 0
+        ? amountIOweFromSettlements
+        : (netBalance < 0 ? netBalance.abs() : 0.0);
 
     final rawRecent = expense.dashboardData?['recent_transactions'] as List?;
     final displayedRecent = (rawRecent != null && rawRecent.isNotEmpty)
         ? rawRecent.map((tx) {
             final catName = tx['category_name'] as String? ?? 'General';
+            final int? payerId = tx['payer_id'] is int
+                ? tx['payer_id']
+                : int.tryParse(tx['payer_id']?.toString() ?? '');
+            final bool isPayer = payerId == currentUserId;
+            final double fullAmount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+            final String payerName = (tx['payer_name'] as String? ?? 'Member').trim();
+
+            final rawSplits = tx['splits'] as List?;
+            double mySplit = 0.0;
+            bool userInSplit = false;
+            if (rawSplits != null) {
+              for (var s in rawSplits) {
+                final sUid = s['user_id'] is int ? s['user_id'] : int.tryParse(s['user_id']?.toString() ?? '');
+                if (sUid == currentUserId) {
+                  mySplit = double.tryParse(s['amount']?.toString() ?? '0') ?? 0.0;
+                  userInSplit = true;
+                  break;
+                }
+              }
+            }
+
+            String userStatus = (tx['user_status'] as String? ?? '').trim();
+            String userStatusLabel = (tx['user_status_label'] as String? ?? '').trim();
+            String displayUserAmount = (tx['formatted_user_amount'] as String? ?? '').trim();
+
+            if (userStatus.isEmpty) {
+              final type = tx['type'] as String? ?? 'expense';
+              if (type == 'expense') {
+                if (isPayer) {
+                  final lent = (rawSplits != null && rawSplits.isNotEmpty)
+                      ? (fullAmount - mySplit).clamp(0.0, double.infinity)
+                      : 0.0;
+                  if (lent > 0.001) {
+                    userStatus = 'lent';
+                    userStatusLabel = 'You lent';
+                    displayUserAmount = '+$currency ${lent.toStringAsFixed(lent.truncateToDouble() == lent ? 0 : 2)}';
+                  } else {
+                    userStatus = 'paid';
+                    userStatusLabel = 'You paid';
+                    displayUserAmount = '$currency ${fullAmount.toStringAsFixed(fullAmount.truncateToDouble() == fullAmount ? 0 : 2)}';
+                  }
+                } else {
+                  if (userInSplit && mySplit > 0.001) {
+                    userStatus = 'owe';
+                    userStatusLabel = 'You owe';
+                    displayUserAmount = '-$currency ${mySplit.toStringAsFixed(mySplit.truncateToDouble() == mySplit ? 0 : 2)}';
+                  } else {
+                    userStatus = 'none';
+                    userStatusLabel = 'Not involved';
+                    displayUserAmount = '$currency 0';
+                  }
+                }
+              }
+            }
+
+            final dateStr = tx['formatted_date'] as String? ?? 'Recent';
+            final payerSubtitle = isPayer
+                ? 'You paid $currency ${fullAmount.toStringAsFixed(0)} • $dateStr'
+                : '$payerName paid $currency ${fullAmount.toStringAsFixed(0)} • $dateStr';
+
             return {
+              'id': tx['id'],
               'title': tx['description'] as String? ?? 'Expense',
-              'payer': tx['payer_name'] as String? ?? 'Member',
-              'date': tx['formatted_date'] as String? ?? 'Recent',
+              'payer': payerSubtitle,
+              'date': dateStr,
               'amount': tx['formatted_amount'] as String? ?? '$currency ${tx['amount']}',
+              'userStatus': userStatus,
+              'userStatusLabel': userStatusLabel.isNotEmpty ? userStatusLabel : 'Expense',
+              'userAmount': displayUserAmount.isNotEmpty ? displayUserAmount : (tx['formatted_amount'] as String? ?? '$currency ${tx['amount']}'),
               'icon': _getCategoryIcon(catName),
               'iconColor': _getCategoryColor(catName),
               'iconBg': _getCategoryBg(catName),
@@ -239,32 +330,33 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
                               ),
                             ),
 
-                            // Budget Content Area
+                            // Total Trip Expense & Personal Balance Area
                             Padding(
                               padding: const EdgeInsets.all(18.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Top Row: Total Trip Expense & Count
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'Total Trip Budget',
+                                            'Total Trip Expense',
                                             style: TextStyle(
-                                              fontSize: 13,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w600,
                                               color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 2),
                                           Text(
-                                            '$currency ${totalBudgetNum.toStringAsFixed(0)}',
+                                            '$currency ${totalSpentNum.toStringAsFixed(totalSpentNum % 1 == 0 ? 0 : 2)}',
                                             style: TextStyle(
-                                              fontSize: 28,
+                                              fontSize: 26,
                                               fontWeight: FontWeight.w800,
                                               color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
                                               letterSpacing: -0.5,
@@ -272,33 +364,31 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
                                           ),
                                         ],
                                       ),
-                                      // Remaining Badge
+                                      // Total Expenses Count Badge
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                                         decoration: BoxDecoration(
                                           color: isDark ? AppColors.elevatedDark : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(14),
                                           border: Border.all(
                                             color: isDark ? AppColors.borderDark : Colors.grey.shade200,
                                           ),
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text(
-                                              '$currency ${remainingNum.toStringAsFixed(0)}',
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w800,
-                                                color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                              ),
+                                            const Icon(
+                                              Icons.receipt_long_rounded,
+                                              size: 15,
+                                              color: AppColors.primary,
                                             ),
+                                            const SizedBox(width: 5),
                                             Text(
-                                              'Remaining',
+                                              '$expenseCount ${expenseCount == 1 ? 'Expense' : 'Expenses'}',
                                               style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w500,
-                                                color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
                                               ),
                                             ),
                                           ],
@@ -307,38 +397,200 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
                                     ],
                                   ),
 
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 14),
+                                  Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                                  const SizedBox(height: 14),
 
-                                  // Spent Progress Bar
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: LinearProgressIndicator(
-                                      value: spentPercent,
-                                      minHeight: 8,
-                                      backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 8),
-
+                                  // Personal Ledger: You Lent vs You Owe
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        '$currency ${totalSpentNum.toStringAsFixed(0)} spent',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                      // 1. You Lent Card
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => Navigator.of(context).pushNamed(
+                                              '/settle_up',
+                                              arguments: {'tripId': tripId},
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF161F30) : const Color(0xFFF8FAFC),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: isDark ? const Color(0xFF243048) : const Color(0xFFE2E8F0),
+                                                  width: 1,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: isDark ? Colors.black.withOpacity(0.2) : const Color(0x0A0F172A),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Container(
+                                                            width: 24,
+                                                            height: 24,
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFF10B981).withOpacity(0.14),
+                                                              borderRadius: BorderRadius.circular(7),
+                                                            ),
+                                                            child: const Icon(
+                                                              Icons.south_west_rounded,
+                                                              size: 13,
+                                                              color: Color(0xFF059669),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Text(
+                                                            'You Lent',
+                                                            style: TextStyle(
+                                                              fontSize: 12.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Icon(
+                                                        Icons.chevron_right_rounded,
+                                                        size: 16,
+                                                        color: isDark ? Colors.white30 : Colors.black26,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 10),
+                                                  Text(
+                                                    '+$currency ${effectiveLent.toStringAsFixed(effectiveLent % 1 == 0 ? 0 : 2)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: Color(0xFF059669),
+                                                      letterSpacing: -0.3,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 3),
+                                                  Text(
+                                                    countILent > 0
+                                                        ? '$countILent ${countILent == 1 ? 'payment to receive' : 'payments to receive'}'
+                                                        : (effectiveLent > 0 ? 'To receive' : 'All settled'),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        '${(spentPercent * 100).toInt()}%',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primary,
+                                      const SizedBox(width: 10),
+                                      // 2. You Owe Card
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => Navigator.of(context).pushNamed(
+                                              '/settle_up',
+                                              arguments: {'tripId': tripId},
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF161F30) : const Color(0xFFF8FAFC),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: isDark ? const Color(0xFF243048) : const Color(0xFFE2E8F0),
+                                                  width: 1,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: isDark ? Colors.black.withOpacity(0.2) : const Color(0x0A0F172A),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Container(
+                                                            width: 24,
+                                                            height: 24,
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFFEF4444).withOpacity(0.14),
+                                                              borderRadius: BorderRadius.circular(7),
+                                                            ),
+                                                            child: const Icon(
+                                                              Icons.north_east_rounded,
+                                                              size: 13,
+                                                              color: Color(0xFFDC2626),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Text(
+                                                            'You Owe',
+                                                            style: TextStyle(
+                                                              fontSize: 12.5,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Icon(
+                                                        Icons.chevron_right_rounded,
+                                                        size: 16,
+                                                        color: isDark ? Colors.white30 : Colors.black26,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 10),
+                                                  Text(
+                                                    '-$currency ${effectiveOwe.toStringAsFixed(effectiveOwe % 1 == 0 ? 0 : 2)}',
+                                                    style: TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: effectiveOwe > 0.001
+                                                          ? const Color(0xFFDC2626)
+                                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted),
+                                                      letterSpacing: -0.3,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 3),
+                                                  Text(
+                                                    countIOwe > 0
+                                                        ? '$countIOwe ${countIOwe == 1 ? 'payment to make' : 'payments to make'}'
+                                                        : (effectiveOwe > 0 ? 'To pay' : 'All settled'),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -503,27 +755,44 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
                                           ],
                                         ),
                                       ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            item['amount'] as String,
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w800,
-                                              color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            item['date'] as String,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                                            ),
-                                          ),
-                                        ],
+                                      Builder(
+                                        builder: (context) {
+                                          final status = item['userStatus'] as String? ?? '';
+                                          final isLent = status == 'lent' || status == 'settled_received';
+                                          final isOwe = status == 'owe' || status == 'settled_paid';
+                                          final statusColor = isLent
+                                              ? const Color(0xFF10B981)
+                                              : (isOwe
+                                                  ? const Color(0xFFEF4444)
+                                                  : (isDark ? AppColors.textDarkMain : AppColors.textLightMain));
+
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                item['userAmount'] as String,
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: statusColor,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                item['userStatusLabel'] as String,
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isLent
+                                                      ? const Color(0xFF10B981)
+                                                      : (isOwe
+                                                          ? const Color(0xFFEF4444)
+                                                          : (isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),

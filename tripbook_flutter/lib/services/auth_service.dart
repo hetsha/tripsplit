@@ -8,11 +8,11 @@ enum AuthState { uninitialized, authenticated, unauthenticated, loading }
 
 class AuthService extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
-  
+
   User? _currentUser;
   List<Trip> _trips = [];
   int? _activeTripId;
-  
+
   AuthState _state = AuthState.uninitialized;
   bool _needsTripSelection = false;
 
@@ -40,6 +40,7 @@ class AuthService extends ChangeNotifier {
   List<Map<String, dynamic>> _detailedTrips = [];
   Map<String, dynamic> _tripStats = {};
   bool _isFetchingTrips = false;
+  bool _isCreatingTrip = false;
 
   List<Map<String, dynamic>> get detailedTrips => _detailedTrips;
   Map<String, dynamic> get tripStats => _tripStats;
@@ -83,24 +84,34 @@ class AuthService extends ChangeNotifier {
     double? startingMoney,
     List<String>? members,
   }) async {
-    final payload = {
-      'action': 'create',
-      'name': name,
-      if (description != null && description.isNotEmpty) 'description': description,
-      if (startingMoney != null && startingMoney > 0) 'starting_money': startingMoney,
-      if (members != null && members.isNotEmpty) 'members': members,
-    };
+    if (_isCreatingTrip) {
+      throw Exception('Trip creation already in progress...');
+    }
+    _isCreatingTrip = true;
+    try {
+      final payload = {
+        'action': 'create',
+        'name': name,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        if (startingMoney != null && startingMoney > 0)
+          'starting_money': startingMoney,
+        if (members != null && members.isNotEmpty) 'members': members,
+      };
 
-    final res = await _apiClient.post(ApiEndpoints.createTrip, payload);
-    if (res['success'] == true && res['data'] != null) {
-      final newId = res['data']['trip_id'];
-      if (newId != null) {
-        _activeTripId = int.tryParse(newId.toString());
+      final res = await _apiClient.post(ApiEndpoints.createTrip, payload);
+      if (res['success'] == true && res['data'] != null) {
+        final newId = res['data']['trip_id'];
+        if (newId != null) {
+          _activeTripId = int.tryParse(newId.toString());
+        }
+        await fetchTripsList();
+        return Map<String, dynamic>.from(res['data'] as Map);
+      } else {
+        throw Exception(res['message'] ?? 'Failed to create trip');
       }
-      await fetchTripsList();
-      return res['data'];
-    } else {
-      throw Exception(res['message'] ?? 'Failed to create trip');
+    } finally {
+      _isCreatingTrip = false;
     }
   }
 
@@ -148,7 +159,8 @@ class AuthService extends ChangeNotifier {
 
   // Load Members for a Trip
   Future<Map<String, dynamic>> loadTripMembers({required int tripId}) async {
-    final res = await _apiClient.get(ApiEndpoints.members, queryParameters: {'trip_id': tripId});
+    final res = await _apiClient
+        .get(ApiEndpoints.members, queryParameters: {'trip_id': tripId});
     if (res['success'] == true && res['data'] != null) {
       return Map<String, dynamic>.from(res['data']);
     }
@@ -208,16 +220,16 @@ class AuthService extends ChangeNotifier {
         final data = res['data'];
         _currentUser = User.fromJson(data['user']);
         _apiClient.setUserId(_currentUser?.id);
-        
+
         if (data['trips'] is List) {
           final List rawTrips = data['trips'];
           _trips = rawTrips.map((t) => Trip.fromJson(t)).toList();
         }
-        
+
         if (data['active_trip'] != null) {
           _activeTripId = int.parse(data['active_trip'].toString());
         }
-        
+
         _state = AuthState.authenticated;
       } else {
         _state = AuthState.unauthenticated;
@@ -225,7 +237,7 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       _state = AuthState.unauthenticated;
     }
-    
+
     // Also load detailed trips list from DB
     await fetchTripsList();
     notifyListeners();
@@ -322,7 +334,8 @@ class AuthService extends ChangeNotifier {
   // Switch Active Trip
   Future<void> switchTrip(int tripId) async {
     try {
-      final res = await _apiClient.post(ApiEndpoints.switchTrip, {'trip_id': tripId});
+      final res =
+          await _apiClient.post(ApiEndpoints.switchTrip, {'trip_id': tripId});
       if (res['success'] == true) {
         _activeTripId = tripId;
         _needsTripSelection = false;
@@ -338,7 +351,7 @@ class AuthService extends ChangeNotifier {
     try {
       await _apiClient.get(ApiEndpoints.logout);
     } catch (_) {}
-    
+
     _currentUser = null;
     _trips = [];
     _activeTripId = null;
