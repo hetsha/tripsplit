@@ -89,11 +89,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             TripSplitHeader(
               title: 'Create a New Trip',
               onBack: () => Navigator.of(context).maybePop(),
-              rightAction: IconButton(
-                icon: const Icon(Icons.dns_rounded, color: AppColors.primary),
-                tooltip: 'Server & IP Settings',
-                onPressed: () => TripSplitServerConfigDialog.show(context),
-              ),
             ),
 
             Expanded(
@@ -391,12 +386,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                                   SnackBar(
                                     content: Text('Cannot connect: $e'),
                                     backgroundColor: AppColors.negative,
-                                    duration: const Duration(seconds: 8),
-                                    action: SnackBarAction(
-                                      label: 'Change IP',
-                                      textColor: Colors.white,
-                                      onPressed: () => TripSplitServerConfigDialog.show(context),
-                                    ),
+                                    duration: const Duration(seconds: 4),
                                   ),
                                 );
                               } finally {

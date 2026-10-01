@@ -22,9 +22,6 @@ class ApiClient {
     _dio.options.responseType = ResponseType.plain;
     
     // Load persisted session on init
-    _secureStorage.read(key: 'custom_base_url').then((v) {
-      if (v != null && v.trim().isNotEmpty) _baseUrl = v.trim();
-    });
     _secureStorage.read(key: 'session_cookie').then((v) => _sessionCookie = v);
     _secureStorage.read(key: 'csrf_token').then((v) => _csrfToken = v);
     _secureStorage.read(key: 'user_id').then((v) {
@@ -111,7 +108,6 @@ class ApiClient {
       formatted += '/';
     }
     _baseUrl = formatted;
-    await _secureStorage.write(key: 'custom_base_url', value: formatted);
   }
 
   Future<Map<String, dynamic>> testConnection([String? testUrl]) async {

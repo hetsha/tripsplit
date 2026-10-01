@@ -4,7 +4,6 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_notifier.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/tripsplit_widgets.dart';
-import '../../core/api/api_client.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -245,15 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                          _buildTile(
-                            icon: Icons.dns_rounded,
-                            iconColor: const Color(0xFF6366F1),
-                            title: 'Server & Network API',
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => TripSplitServerConfigDialog.show(context),
-                            isDark: isDark,
-                          ),
-                          Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+
                           _buildTile(
                             icon: Icons.help_outline_rounded,
                             iconColor: const Color(0xFFF59E0B),

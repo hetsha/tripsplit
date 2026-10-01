@@ -1,4 +1,8 @@
 class ApiEndpoints {
+  // Configure your Backend API base URL directly here in code:
+  // - Wi-Fi on physical device: 'http://<YOUR_PC_LAN_IP>/tripsplit/api/'
+  // - USB Cable (`adb reverse tcp:80 tcp:80`): 'http://127.0.0.1/tripsplit/api/'
+  // - Production domain: 'https://api.yourdomain.com/tripsplit/api/'
   static const String defaultLocalBaseUrl = 'http://192.168.1.11/tripsplit/api/';
   
   // Auth
