@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_service.dart';
 import 'services/expense_service.dart';
 import 'theme/theme_notifier.dart';
@@ -11,6 +12,7 @@ import 'features/auth/login_screen.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/trips/create_trip_screen.dart';
+import 'features/trips/select_group_type_screen.dart';
 import 'features/dashboard/trip_dashboard_screen.dart';
 import 'features/expenses/add_expense_screen.dart';
 import 'features/expenses/all_expenses_screen.dart';
@@ -21,12 +23,29 @@ import 'features/members/trip_members_screen.dart';
 import 'features/settings/trip_settings_screen.dart';
 import 'features/profile/profile_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Pre-load theme preference synchronously before runApp to prevent any 1-second theme transfer
+  final prefs = await SharedPreferences.getInstance();
+  final prefString = prefs.getString('theme_mode');
+  
+  ThemeMode initialMode = ThemeMode.dark;
+  if (prefString == 'light') {
+    initialMode = ThemeMode.light;
+  } else if (prefString == 'dark') {
+    initialMode = ThemeMode.dark;
+  } else if (prefString == 'system') {
+    initialMode = ThemeMode.system;
+  } else {
+    // Default to dark theme if no preference is saved yet
+    initialMode = ThemeMode.dark;
+  }
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+        ChangeNotifierProvider(create: (_) => ThemeNotifier(initialMode: initialMode)),
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => ExpenseService()),
       ],
@@ -55,6 +74,7 @@ class TripSplitApp extends StatelessWidget {
         '/splash': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),
         '/create_trip': (context) => const CreateTripScreen(),
+        '/select_type': (context) => const SelectGroupTypeScreen(),
         '/dashboard': (context) => const TripDashboardScreen(),
         '/add_expense': (context) => const AddExpenseScreen(),
         '/all_expenses': (context) => const AllExpensesScreen(),

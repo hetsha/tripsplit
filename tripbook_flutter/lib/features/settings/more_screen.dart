@@ -55,7 +55,7 @@ class MoreScreen extends StatelessWidget {
               iconColor: AppColors.positive,
               title: 'Create New Group',
               subtitle: 'Start tracking another group',
-              onTap: () => _showCreateTripSheet(context, isDark),
+              onTap: () => Navigator.of(context).pushNamed('/create_trip'),
             ),
             _buildActionTile(
               context,

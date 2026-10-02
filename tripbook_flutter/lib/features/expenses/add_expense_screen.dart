@@ -2442,106 +2442,171 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF10172A) : Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top drag handle
               Center(
                 child: Container(
-                  width: 40,
+                  width: 38,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.3),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.18),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+
+              // Header Row with AI Badge and Close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6C38FF), Color(0xFF8B5CF6)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6C38FF).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, size: 12, color: Colors.white),
+                        SizedBox(width: 5),
+                        Text(
+                          'AI SMART SCAN',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark ? Colors.white10 : Colors.black.withOpacity(0.06),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
               Text(
                 'Add Bill / Receipt',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'TripBook reads the total, merchant & items to split in this trip',
+                'TripBook auto-extracts total, items & tax to split with your group',
                 style: TextStyle(
                   fontSize: 13,
+                  height: 1.3,
                   color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
                 ),
               ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
-                ),
-                title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Click photo of physical paper bill or receipt'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 18),
+
+              // Option 1: Take Photo
+              _buildScanOptionCard(
+                context: context,
+                isDark: isDark,
+                title: 'Take Photo',
+                subtitle: 'Snap a picture of physical paper bill or receipt',
+                icon: Icons.camera_alt_rounded,
+                gradient: const [Color(0xFF2563EB), Color(0xFF06B6D4)],
                 onTap: () => _pickImage(ImageSource.camera),
               ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.photo_library_rounded, color: Colors.purple),
-                ),
-                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Pick screenshot, PDF invoice image, or saved bill'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 10),
+
+              // Option 2: Choose from Gallery
+              _buildScanOptionCard(
+                context: context,
+                isDark: isDark,
+                title: 'Choose from Gallery',
+                subtitle: 'Pick screenshot, PDF invoice image, or saved bill',
+                icon: Icons.photo_library_rounded,
+                gradient: const [Color(0xFF7C3AED), Color(0xFFC026D3)],
                 onTap: () => _pickImage(ImageSource.gallery),
               ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
-                ),
-                title: const Text('Test with Demo Bill', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Simulate AI scanning with a sample restaurant bill'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 10),
+
+              // Option 3: Test with Demo Bill
+              _buildScanOptionCard(
+                context: context,
+                isDark: isDark,
+                title: 'Test with Demo Bill',
+                subtitle: 'Simulate AI scanning with a sample restaurant bill',
+                icon: Icons.auto_awesome_rounded,
+                gradient: const [Color(0xFFD97706), Color(0xFFF59E0B)],
+                badgeText: 'DEMO',
                 onTap: _scanDemoReceipt,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
+
+              // Bottom Pro-Tip Banner
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                  borderRadius: BorderRadius.circular(12),
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.share_rounded, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.share_rounded, size: 16, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Tip: Share a bill image directly from WhatsApp or Gallery into TripBook to auto-read & split!',
+                        'Tip: Share any bill image directly from WhatsApp or Gallery into TripBook to auto-read & split!',
                         style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                          fontSize: 11.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? AppColors.textDarkMuted : const Color(0xFF475569),
                         ),
                       ),
                     ),
@@ -2549,6 +2614,145 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanOptionCard({
+    required BuildContext context,
+    required bool isDark,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Color> gradient,
+    String? badgeText,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Gradient Icon Avatar
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient.first.withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(icon, color: Colors.white, size: 23),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Title, Subtitle & optional badge
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                          if (badgeText != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: gradient.first.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                badgeText,
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: gradient.first,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Trailing Chevron
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 11,
+                    color: isDark ? Colors.white54 : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2583,7 +2787,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   Future<void> _processReceiptFile(File file) async {
     setState(() {
       _isScanningReceipt = true;
-      _receiptLocalPath = file.path;
     });
 
     try {
@@ -2658,7 +2861,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   void _showReceiptReviewSheet(Map<String, dynamic> data, String? receiptUrl, String? localPath) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleController = TextEditingController(text: data['title']?.toString() ?? 'Bill Expense');
-    final amountController = TextEditingController(text: (data['amount'] ?? 0.0).toString());
+    final rawAmt = data['amount'];
+    final double numAmt = (rawAmt is num)
+        ? rawAmt.toDouble()
+        : (double.tryParse(rawAmt?.toString() ?? '') ?? 0.0);
+    final initialAmtText = numAmt > 0
+        ? (numAmt % 1 == 0 ? numAmt.toInt().toString() : numAmt.toStringAsFixed(2))
+        : '';
+    final amountController = TextEditingController(text: initialAmtText);
     final items = (data['items'] is List) ? List<Map<String, dynamic>>.from(data['items']) : <Map<String, dynamic>>[];
     final categoryName = data['category_name']?.toString() ?? 'Food & Dining';
     final rawDate = data['date']?.toString() ?? '';
@@ -2869,7 +3079,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
                     setState(() {
                       _titleController.text = parsedTitle.isNotEmpty ? parsedTitle : 'Bill Expense';
-                      _amountController.text = parsedAmt > 0 ? parsedAmt.toStringAsFixed(2) : amountController.text;
+                      _amountController.text = parsedAmt > 0
+                          ? (parsedAmt % 1 == 0 ? parsedAmt.toInt().toString() : parsedAmt.toStringAsFixed(2))
+                          : (amountController.text.trim().isNotEmpty ? amountController.text.trim() : '0.0');
                       _receiptUrl = receiptUrl;
                       _receiptLocalPath = localPath;
 
@@ -2898,7 +3110,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       }
 
                       // Recalculate group splits with the new total!
-                      _recalculateSplits();
+                      if (_splitEqually) {
+                        _recalculateEqualSplit();
+                      }
                       if (_isMultiplePayers) {
                         _recalculateEqualPayers();
                       }

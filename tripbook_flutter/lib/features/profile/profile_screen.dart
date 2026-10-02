@@ -239,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value: themeNotifier.themeMode == ThemeMode.dark,
                               activeColor: AppColors.primary,
                               onChanged: (val) {
-                                themeNotifier.toggleTheme();
+                                themeNotifier.toggleTheme(isCurrentlyDark: isDark);
                               },
                             ),
                           ),

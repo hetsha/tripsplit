@@ -88,6 +88,31 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               isPositive = false;
             }
 
+            String catName = 'Trip';
+            IconData catIcon = Icons.flight_takeoff_rounded;
+            Color catColor = const Color(0xFF6366F1);
+
+            final fullDescLower = ((t['description'] as String?) ?? '').toLowerCase();
+            final titleLower = title.toLowerCase();
+
+            if (fullDescLower.contains('[home]') || titleLower.contains('home') || titleLower.contains('apartment') || titleLower.contains('flat')) {
+              catName = 'Home';
+              catIcon = Icons.home_rounded;
+              catColor = const Color(0xFF10B981);
+            } else if (fullDescLower.contains('[couple]') || titleLower.contains('couple') || titleLower.contains('us ') || titleLower.contains('love')) {
+              catName = 'Couple';
+              catIcon = Icons.favorite_rounded;
+              catColor = const Color(0xFFEC4899);
+            } else if (fullDescLower.contains('[personal]') || titleLower.contains('personal') || titleLower.contains('wallet')) {
+              catName = 'Personal';
+              catIcon = Icons.person_rounded;
+              catColor = const Color(0xFF06B6D4);
+            } else if (fullDescLower.contains('[business') || fullDescLower.contains('[office') || titleLower.contains('office') || titleLower.contains('work')) {
+              catName = 'Business';
+              catIcon = Icons.business_center_rounded;
+              catColor = const Color(0xFFF59E0B);
+            }
+
             return {
               'id': id,
               'title': title,
@@ -104,9 +129,9 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
               'myNet': myNet,
               'isPositive': isPositive,
               'isSettled': isSettled,
-              'category': 'Adventure',
-              'categoryIcon': Icons.travel_explore_rounded,
-              'categoryColor': const Color(0xFF6366F1),
+              'category': catName,
+              'categoryIcon': catIcon,
+              'categoryColor': catColor,
               'avatars': (t['members'] as List?)
                       ?.map((m) => 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100')
                       .take(3)
@@ -187,55 +212,6 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Security Vault Label
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4, bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF59E0B),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'TRIPSPLIT DIGITAL VAULT',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.2,
-                                    color: isDark ? Colors.white60 : Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.lock_outline_rounded, size: 11, color: Color(0xFFF59E0B)),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '256-Bit Encrypted',
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
                       // 1. PAYMENT CARD
                       TripSplitPaymentCard(
@@ -946,7 +922,7 @@ class _AllGroupsHomeScreenState extends State<AllGroupsHomeScreen> {
           // Quick Theme Toggle (Sun / Moon)
           GestureDetector(
             onTap: () {
-              Provider.of<ThemeNotifier>(context, listen: false).toggleTheme();
+              Provider.of<ThemeNotifier>(context, listen: false).toggleTheme(isCurrentlyDark: isDark);
             },
             child: Container(
               width: 36,

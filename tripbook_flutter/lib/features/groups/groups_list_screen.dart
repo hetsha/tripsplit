@@ -276,7 +276,7 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                   AppColors.primary,
                   () {
                     Navigator.pop(ctx);
-                    _showCreateGroupDialog(context, isDark);
+                    Navigator.of(context).pushNamed('/create_trip');
                   },
                 ),
                 _buildSheetOption(

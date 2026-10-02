@@ -39,6 +39,22 @@ function getDBConnection(): PDO {
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+            $isApi = strpos($uri, '/api/') !== false || strpos($accept, 'application/json') !== false;
+
+            if ($isApi) {
+                http_response_code(500);
+                header('Content-Type: application/json; charset=utf-8');
+                $msg = ((int)$e->getCode() === 2002 || strpos($e->getMessage(), '2002') !== false)
+                    ? 'Cannot connect to MySQL database. Please make sure MySQL is running in your XAMPP Control Panel.'
+                    : (((int)$e->getCode() === 1049)
+                        ? "Database '" . DB_NAME . "' does not exist. Please run setup.php to initialize it."
+                        : 'Database error: ' . $e->getMessage());
+                echo json_encode(['success' => false, 'message' => $msg], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
             // Code 1049 indicates database does not exist
             if ($e->getCode() === 1049) {
                 throw new PDOException("Database '" . DB_NAME . "' does not exist. Please run setup.php to initialize it.", 1049);
