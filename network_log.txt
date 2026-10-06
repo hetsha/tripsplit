@@ -1,0 +1,2 @@
+2026-10-06 15:10:34 | Request from: 192.168.1.5 | Method: HEAD | Path: /tripsplit/api/ping.php
+2026-10-06 15:10:34 | Request from: 192.168.1.5 | Method: GET | Path: /tripsplit/api/ping.php

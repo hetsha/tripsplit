@@ -142,8 +142,22 @@ $extractedData = null;
 $rawText = '';
 $confidence = 0.85;
 
-// Try Gemini Vision AI Extraction if key is present
-if (!empty($geminiApiKey)) {
+// 1. Check if client provided pre-parsed OCR data (from On-Device ML Kit)
+if (!empty($input['extracted_data']) && is_array($input['extracted_data'])) {
+    $extractedData = $input['extracted_data'];
+    $rawText = (string)($extractedData['raw_text'] ?? ($input['raw_text'] ?? ''));
+    $confidence = (float)($extractedData['confidence'] ?? 0.95);
+} elseif (!empty($_POST['extracted_data'])) {
+    $parsed = json_decode((string)$_POST['extracted_data'], true);
+    if (is_array($parsed)) {
+        $extractedData = $parsed;
+        $rawText = (string)($extractedData['raw_text'] ?? '');
+        $confidence = (float)($extractedData['confidence'] ?? 0.95);
+    }
+}
+
+// 2. Try Gemini Vision AI Extraction if key is present and no client data was provided
+if (!$extractedData && !empty($geminiApiKey)) {
     $geminiResult = callGeminiVisionReceipt($imageContent, $mimeType, $geminiApiKey);
     if ($geminiResult && !empty($geminiResult['data'])) {
         $extractedData = $geminiResult['data'];
@@ -152,7 +166,7 @@ if (!empty($geminiApiKey)) {
     }
 }
 
-// Fallback: If Gemini wasn't available or failed, use Regex & Rule-Based OCR Parser
+// 3. Fallback: If Gemini wasn't available or failed, use Regex & Rule-Based OCR Parser
 if (!$extractedData) {
     $extractedData = fallbackReceiptParser($imageContent, $mimeType);
     $confidence = (float)($extractedData['confidence'] ?? 0.75);

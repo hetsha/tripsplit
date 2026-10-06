@@ -812,51 +812,33 @@ class _TripSplitPaymentCardState extends State<TripSplitPaymentCard>
                     ),
 
                     // --- CARD NUMBER: 3D Stamped Embossed Foil Numbers ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _displayCardNumber,
-                          style: TextStyle(
-                            color: const Color(0xFFF8FAFC),
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                            letterSpacing: 2.8,
-                            shadows: [
-                              // 3D Stamped Bevel Specular Highlights
-                              Shadow(
-                                color: Colors.white.withOpacity(0.85),
-                                offset: const Offset(-0.8, -0.8),
-                                blurRadius: 0.5,
-                              ),
-                              // Deep Emboss Under-Shadow
-                              Shadow(
-                                color: Colors.black.withOpacity(0.95),
-                                offset: const Offset(1.5, 1.8),
-                                blurRadius: 2.5,
-                              ),
-                            ],
-                          ),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _displayCardNumber,
+                        style: TextStyle(
+                          color: _isCopied ? const Color(0xFF34D399) : const Color(0xFFF8FAFC),
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace',
+                          letterSpacing: 2.8,
+                          shadows: [
+                            // 3D Stamped Bevel Specular Highlights
+                            Shadow(
+                              color: _isCopied ? const Color(0xFF34D399).withOpacity(0.9) : Colors.white.withOpacity(0.85),
+                              offset: const Offset(-0.8, -0.8),
+                              blurRadius: 0.5,
+                            ),
+                            // Deep Emboss Under-Shadow
+                            Shadow(
+                              color: Colors.black.withOpacity(0.95),
+                              offset: const Offset(1.5, 1.8),
+                              blurRadius: 2.5,
+                            ),
+                          ],
                         ),
-                        if (_isCopied)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.positive.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppColors.positive, width: 0.8),
-                            ),
-                            child: const Text(
-                              'COPIED',
-                              style: TextStyle(
-                                fontSize: 7.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.positive,
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
                     ),
 
                     // --- BOTTOM ROW: Cardholder, Valid Thru, Hologram & Logo ---

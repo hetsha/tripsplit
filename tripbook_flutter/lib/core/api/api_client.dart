@@ -11,7 +11,17 @@ class ApiClient {
   String? _sessionCookie;
   String? _csrfToken;
   int? _userId;
-  String _baseUrl = ApiEndpoints.defaultLocalBaseUrl;
+  static const List<String> fallbackUrls = [
+    'http://192.168.1.5/tripsplit/api/',
+    'http://127.0.0.1/tripsplit/api/',
+    'http://10.0.2.2/tripsplit/api/',
+    'http://localhost/tripsplit/api/',
+  ];
+
+  String? _customBaseUrl;
+  String _activeBaseUrl = ApiEndpoints.defaultLocalBaseUrl;
+
+  String get baseUrl => _customBaseUrl ?? _activeBaseUrl;
 
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -107,18 +117,18 @@ class ApiClient {
     if (!formatted.endsWith('/')) {
       formatted += '/';
     }
-    _baseUrl = formatted;
+    _customBaseUrl = formatted;
   }
 
   Future<Map<String, dynamic>> testConnection([String? testUrl]) async {
     final urlToTest = (testUrl != null && testUrl.trim().isNotEmpty)
         ? (testUrl.trim().endsWith('/') ? testUrl.trim() : '${testUrl.trim()}/')
-        : _baseUrl;
+        : baseUrl;
     try {
       final dio = Dio();
       dio.options.connectTimeout = const Duration(seconds: 4);
       dio.options.receiveTimeout = const Duration(seconds: 4);
-      final res = await dio.get('${urlToTest}trips.php?action=list');
+      final res = await dio.get('${urlToTest}ping.php');
       return {'success': res.statusCode == 200, 'status': res.statusCode};
     } on DioException catch (e) {
       return {'success': false, 'error': e.type.name, 'message': e.message};
@@ -126,8 +136,6 @@ class ApiClient {
       return {'success': false, 'error': e.toString()};
     }
   }
-
-  String get baseUrl => _baseUrl;
 
   void setUserId(int? id) {
     _userId = id;
@@ -150,11 +158,24 @@ class ApiClient {
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? queryParameters}) async {
     try {
       final response = await _dio.get(
-        '$_baseUrl$path',
+        '$baseUrl$path',
         queryParameters: queryParameters,
       );
       return _processResponse(response);
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        final working = await _tryFindWorkingUrl();
+        if (working != null && working != baseUrl) {
+          _activeBaseUrl = working;
+          try {
+            final retryResponse = await _dio.get(
+              '$working$path',
+              queryParameters: queryParameters,
+            );
+            return _processResponse(retryResponse);
+          } catch (_) {}
+        }
+      }
       throw _handleDioError(e);
     }
   }
@@ -162,13 +183,42 @@ class ApiClient {
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
     try {
       final response = await _dio.post(
-        '$_baseUrl$path',
+        '$baseUrl$path',
         data: data,
       );
       return _processResponse(response);
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        final working = await _tryFindWorkingUrl();
+        if (working != null && working != baseUrl) {
+          _activeBaseUrl = working;
+          try {
+            final retryResponse = await _dio.post(
+              '$working$path',
+              data: data,
+            );
+            return _processResponse(retryResponse);
+          } catch (_) {}
+        }
+      }
       throw _handleDioError(e);
     }
+  }
+
+  Future<String?> _tryFindWorkingUrl() async {
+    for (final candidate in fallbackUrls) {
+      if (candidate == baseUrl) continue;
+      try {
+        final probe = Dio();
+        probe.options.connectTimeout = const Duration(milliseconds: 1500);
+        probe.options.receiveTimeout = const Duration(milliseconds: 1500);
+        final res = await probe.get('${candidate}ping.php');
+        if (res.statusCode == 200) {
+          return candidate;
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   Map<String, dynamic> _processResponse(Response response) {
@@ -196,15 +246,17 @@ class ApiClient {
     print('=== API ERROR ===');
     print('Type: ${e.type}');
     print('Message: ${e.message}');
-    print('Error: ${e.error}');
-    print('Error runtimeType: ${e.error.runtimeType}');
-    if (e.error is Exception) {
-      print('Inner: ${(e.error as Exception)}');
-    }
     print('URL: ${e.requestOptions.uri}');
     print('=================');
     if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
       return ApiException('Network connection timed out. Please try again.');
+    }
+    if (e.type == DioExceptionType.connectionError) {
+      return ApiException(
+        'Cannot connect to server at $baseUrl\n'
+        '• Check that phone & PC are on the same Wi-Fi.\n'
+        '• Or test http://192.168.1.5/tripsplit/ in phone Chrome.'
+      );
     }
     if (e.response != null) {
       final statusCode = e.response!.statusCode;

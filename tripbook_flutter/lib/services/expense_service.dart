@@ -78,12 +78,14 @@ class ExpenseService extends ChangeNotifier {
     String? imageBase64,
     bool isDemo = false,
     int? tripId,
+    Map<String, dynamic>? extractedData,
   }) async {
     try {
       final payload = {
         if (imageBase64 != null) 'image_base64': imageBase64,
         if (isDemo) 'is_demo': true,
         if (tripId != null) 'trip_id': tripId,
+        if (extractedData != null) 'extracted_data': extractedData,
       };
       final res = await _apiClient.post(ApiEndpoints.scanReceipt, payload);
       if (res['success'] == true && res['data'] != null) {

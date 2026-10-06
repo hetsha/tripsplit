@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/tripsplit_widgets.dart';
 import '../../services/auth_service.dart';
 import '../../services/expense_service.dart';
+import '../../services/receipt_scanner_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({Key? key}) : super(key: key);
@@ -2442,12 +2443,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: isDark ? const Color(0xFF10172A) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2790,28 +2793,37 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     });
 
     try {
+      // 1. Instant Offline On-Device OCR & Extraction via Google ML Kit
+      final localScanResult = await ReceiptScannerService().scanReceiptFile(file);
+
+      // 2. Upload image and log receipt in backend database
       final bytes = await file.readAsBytes();
       final base64Image = base64Encode(bytes);
       final expenseService = Provider.of<ExpenseService>(context, listen: false);
       final tripId = _selectedTrip?['id'] as int?;
 
-      final result = await expenseService.scanReceipt(
-        imageBase64: base64Image,
-        tripId: tripId,
-      );
+      Map<String, dynamic>? backendResult;
+      try {
+        backendResult = await expenseService.scanReceipt(
+          imageBase64: base64Image,
+          tripId: tripId,
+          extractedData: localScanResult,
+        );
+      } catch (backendError) {
+        debugPrint('Backend sync note: $backendError');
+      }
 
-      if (result != null && result['data'] != null && mounted) {
-        final data = Map<String, dynamic>.from(result['data']);
-        final receiptUrl = result['receipt_url'] as String?;
-        _showReceiptReviewSheet(data, receiptUrl, file.path);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not extract details automatically. You can enter them manually.'),
-            ),
-          );
+      if (mounted) {
+        // Merge: localScanResult provides accurate on-device extracted details
+        final finalData = Map<String, dynamic>.from(localScanResult);
+        if (backendResult != null && backendResult['data'] is Map) {
+          final bData = Map<String, dynamic>.from(backendResult['data']);
+          if (bData['category_id'] != null) {
+            finalData['category_id'] = bData['category_id'];
+          }
         }
+        final receiptUrl = backendResult?['receipt_url'] as String?;
+        _showReceiptReviewSheet(finalData, receiptUrl, file.path);
       }
     } catch (e) {
       if (mounted) {
@@ -2860,6 +2872,43 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   void _showReceiptReviewSheet(Map<String, dynamic> data, String? receiptUrl, String? localPath) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final expense = Provider.of<ExpenseService>(context, listen: false);
+
+    final availableCategories = expense.categories.isNotEmpty
+        ? expense.categories
+        : [
+            {'id': 1, 'name': 'Food & Dining'},
+            {'id': 2, 'name': 'Transportation'},
+            {'id': 3, 'name': 'Accommodation'},
+            {'id': 4, 'name': 'Activities'},
+            {'id': 5, 'name': 'Shopping'},
+            {'id': 10, 'name': 'Other'},
+          ];
+
+    final initialCategoryName = data['category_name']?.toString() ?? 'Food & Dining';
+
+    // Find initial matching category
+    int selectedCatId = availableCategories.first['id'] as int;
+    String selectedCatName = availableCategories.first['name'] as String;
+    for (final c in availableCategories) {
+      final name = (c['name'] as String).toLowerCase();
+      final catNameLow = initialCategoryName.toLowerCase();
+      if (name.contains(catNameLow) || catNameLow.contains(name)) {
+        selectedCatId = c['id'] as int;
+        selectedCatName = c['name'] as String;
+        break;
+      }
+    }
+
+    // Initial Date
+    final rawDate = data['date']?.toString() ?? '';
+    DateTime selectedDate = DateTime.now();
+    if (rawDate.isNotEmpty) {
+      try {
+        selectedDate = DateTime.parse(rawDate);
+      } catch (_) {}
+    }
+
     final titleController = TextEditingController(text: data['title']?.toString() ?? 'Bill Expense');
     final rawAmt = data['amount'];
     final double numAmt = (rawAmt is num)
@@ -2870,8 +2919,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         : '';
     final amountController = TextEditingController(text: initialAmtText);
     final items = (data['items'] is List) ? List<Map<String, dynamic>>.from(data['items']) : <Map<String, dynamic>>[];
-    final categoryName = data['category_name']?.toString() ?? 'Food & Dining';
-    final rawDate = data['date']?.toString() ?? '';
+    final candidates = (data['candidates'] is List) ? List<String>.from(data['candidates']) : <String>[];
+
+    // Build quick suggestions list
+    final List<String> suggestions = [];
+    for (final cand in candidates) {
+      if (!suggestions.contains(cand) && cand != titleController.text) {
+        suggestions.add(cand);
+      }
+    }
+    for (final itm in items) {
+      final name = itm['name']?.toString() ?? '';
+      if (name.length >= 3 && !suggestions.contains(name) && name != titleController.text) {
+        suggestions.add(name);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -2881,256 +2943,404 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 16,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                left: 20,
+                right: 20,
+                top: 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.positive.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.auto_awesome, color: AppColors.positive, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'Bill Read Successfully',
-                            style: TextStyle(
-                              color: AppColors.positive,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.positive.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (localPath != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(localPath),
-                      height: 130,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                Text(
-                  'Merchant / Title',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g. Starbucks, Shell',
-                    filled: true,
-                    fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Total Amount (₹)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    prefixText: '₹ ',
-                    filled: true,
-                    fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                          borderRadius: BorderRadius.circular(10),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.auto_awesome, color: AppColors.positive, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'Bill Read Successfully',
+                                style: TextStyle(
+                                  color: AppColors.positive,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Category', style: TextStyle(fontSize: 11, color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
-                            const SizedBox(height: 2),
-                            Text(categoryName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          ],
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (localPath != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(localPath),
+                          height: 130,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Merchant / Title header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Merchant / Title',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                          ),
+                        ),
+                        Text(
+                          'Manual edit or tap suggestion',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Farm Villa Pizza, Starbucks',
+                        filled: true,
+                        fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            titleController.clear();
+                            setModalState(() {});
+                          },
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+
+                    if (suggestions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
                           children: [
-                            Text('Date', style: TextStyle(fontSize: 11, color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted)),
-                            const SizedBox(height: 2),
-                            Text(rawDate.isNotEmpty ? rawDate : _formatDate(DateTime.now()), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (items.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    'Detected Line Items (${items.length})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 8),
-                      itemBuilder: (context, idx) {
-                        final itm = items[idx];
-                        return Row(
-                          children: [
-                            Expanded(
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
                               child: Text(
-                                itm['name']?.toString() ?? 'Item',
-                                style: const TextStyle(fontSize: 12),
+                                'Suggestions:',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                ),
                               ),
                             ),
-                            Text(
-                              '₹${itm['price']?.toString() ?? '0'}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
+                            ...suggestions.take(5).map((sugg) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      titleController.text = sugg;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppColors.elevatedDark : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isDark ? AppColors.borderDark : Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      sugg,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.textDarkMain : AppColors.textLightMain,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
                           ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+                    Text(
+                      'Total Amount (₹)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        prefixText: '₹ ',
+                        filled: true,
+                        fillColor: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Category and Date (Both fully manual and interactive)
+                    Row(
+                      children: [
+                        // Category manual selector
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Category (Change)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                  ),
+                                ),
+                                DropdownButtonHideUnderline(
+                                  child: DropdownButton<int>(
+                                    value: selectedCatId,
+                                    isExpanded: true,
+                                    isDense: true,
+                                    dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.primary),
+                                    items: availableCategories.map((c) {
+                                      final id = c['id'] as int;
+                                      final name = c['name'] as String? ?? 'Category';
+                                      return DropdownMenuItem<int>(
+                                        value: id,
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        final matched = availableCategories.firstWhere((c) => c['id'] == val, orElse: () => availableCategories.first);
+                                        setModalState(() {
+                                          selectedCatId = val;
+                                          selectedCatName = matched['name'] as String? ?? 'Category';
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Date manual picker
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: modalCtx,
+                                initialDate: selectedDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                                builder: (pickerCtx, child) {
+                                  return Theme(
+                                    data: isDark ? ThemeData.dark() : ThemeData.light(),
+                                    child: child!,
+                                  );
+                                },
+                              );
+                              if (picked != null) {
+                                setModalState(() {
+                                  selectedDate = picked;
+                                });
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Date (Change)',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                                        ),
+                                      ),
+                                      const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.primary),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _formatDate(selectedDate),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (items.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Detected Line Items (${items.length})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.elevatedDark : AppColors.inputBgLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 8),
+                          itemBuilder: (context, idx) {
+                            final itm = items[idx];
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    itm['name']?.toString() ?? 'Item',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                Text(
+                                  '₹${itm['price']?.toString() ?? '0'}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    TripSplitButton(
+                      label: 'Apply & Split in Trip 🚀',
+                      onPressed: () {
+                        final parsedAmt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                        final parsedTitle = titleController.text.trim();
+
+                        setState(() {
+                          _titleController.text = parsedTitle.isNotEmpty ? parsedTitle : 'Bill Expense';
+                          _amountController.text = parsedAmt > 0
+                              ? (parsedAmt % 1 == 0 ? parsedAmt.toInt().toString() : parsedAmt.toStringAsFixed(2))
+                              : (amountController.text.trim().isNotEmpty ? amountController.text.trim() : '0.0');
+                          _receiptUrl = receiptUrl;
+                          _receiptLocalPath = localPath;
+
+                          _selectedCategoryId = selectedCatId;
+                          _selectedCategoryName = selectedCatName;
+                          _expenseDate = selectedDate;
+
+                          if (items.isNotEmpty) {
+                            final itemSummary = items.map((i) => '${i['name']} (₹${i['price']})').join(', ');
+                            _noteController.text = 'Items: $itemSummary';
+                          }
+
+                          if (_splitEqually) {
+                            _recalculateEqualSplit();
+                          }
+                          if (_isMultiplePayers) {
+                            _recalculateEqualPayers();
+                          }
+                        });
+
+                        Navigator.of(ctx).pop();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Bill applied! ₹${parsedAmt.toStringAsFixed(2)} ready to split.'),
+                            backgroundColor: AppColors.positive,
+                          ),
                         );
                       },
                     ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                TripSplitButton(
-                  label: 'Apply & Split in Trip 🚀',
-                  onPressed: () {
-                    final parsedAmt = double.tryParse(amountController.text.trim()) ?? 0.0;
-                    final parsedTitle = titleController.text.trim();
-
-                    setState(() {
-                      _titleController.text = parsedTitle.isNotEmpty ? parsedTitle : 'Bill Expense';
-                      _amountController.text = parsedAmt > 0
-                          ? (parsedAmt % 1 == 0 ? parsedAmt.toInt().toString() : parsedAmt.toStringAsFixed(2))
-                          : (amountController.text.trim().isNotEmpty ? amountController.text.trim() : '0.0');
-                      _receiptUrl = receiptUrl;
-                      _receiptLocalPath = localPath;
-
-                      // Match category if available
-                      final expense = Provider.of<ExpenseService>(context, listen: false);
-                      final matched = expense.categories.firstWhere(
-                        (c) => (c['name'] as String).toLowerCase().contains(categoryName.toLowerCase()),
-                        orElse: () => {},
-                      );
-                      if (matched.isNotEmpty) {
-                        _selectedCategoryId = matched['id'] as int?;
-                        _selectedCategoryName = matched['name'] as String;
-                      }
-
-                      // Parse date
-                      if (rawDate.isNotEmpty) {
-                        try {
-                          _expenseDate = DateTime.parse(rawDate);
-                        } catch (_) {}
-                      }
-
-                      // Append note with items if available
-                      if (items.isNotEmpty) {
-                        final itemSummary = items.map((i) => '${i['name']} (₹${i['price']})').join(', ');
-                        _noteController.text = 'Items: $itemSummary';
-                      }
-
-                      // Recalculate group splits with the new total!
-                      if (_splitEqually) {
-                        _recalculateEqualSplit();
-                      }
-                      if (_isMultiplePayers) {
-                        _recalculateEqualPayers();
-                      }
-                    });
-
-                    Navigator.of(ctx).pop();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Bill applied! ₹${parsedAmt.toStringAsFixed(2)} ready to split.'),
-                        backgroundColor: AppColors.positive,
-                      ),
-                    );
-                  },
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

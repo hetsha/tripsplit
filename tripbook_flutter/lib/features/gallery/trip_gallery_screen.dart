@@ -705,9 +705,12 @@ class _TripGalleryScreenState extends State<TripGalleryScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Upload to ${album['title']}',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                  Expanded(
+                    child: Text(
+                      'Upload to ${album['title']}',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
