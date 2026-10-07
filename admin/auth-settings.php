@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $authPhoneEnabled = getAuthSetting('auth_phone_enabled', '1');
 $authGoogleEnabled = getAuthSetting('auth_google_enabled', '0');
 $authEmailEnabled = getAuthSetting('auth_email_enabled', '0');
+$authAppleEnabled = getAuthSetting('auth_apple_enabled', '1');
 
 include 'includes/header.php';
 ?>
@@ -215,6 +216,7 @@ include 'includes/header.php';
 <?php endif; ?>
 
 <form method="POST" id="auth-settings-form">
+    <?= csrfField() ?>
 
     <!-- Phone OTP -->
     <div class="auth-method-card">
@@ -377,6 +379,46 @@ include 'includes/header.php';
                 <strong>Gmail Users:</strong> Use an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a> instead of your regular password.
                 <br><br>
                 <strong>If SMTP is empty:</strong> PHP's built-in <code>mail()</code> function will be used (may not work on all servers).
+            </div>
+        </div>
+    </div>
+
+    <!-- Apple Sign-In -->
+    <div class="auth-method-card" style="margin-bottom: 80px;">
+        <div class="auth-method-header">
+            <div class="auth-method-title">
+                <div class="auth-method-icon" style="background: #000000; color: #ffffff;">
+                    
+                </div>
+                <div>
+                    <div class="auth-method-name">Sign in with Apple</div>
+                    <div class="auth-method-desc">Allow users to log in with their Apple ID on iOS, Web and Android</div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="status-badge <?= $authAppleEnabled === '1' ? 'status-enabled' : 'status-disabled' ?>">
+                    <?= $authAppleEnabled === '1' ? 'Enabled' : 'Disabled' ?>
+                </span>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="settings[auth_apple_enabled]" value="1" 
+                           <?= $authAppleEnabled === '1' ? 'checked' : '' ?>
+                           onchange="toggleAuthMethod(this, 'apple-fields')">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="auth-method-fields <?= $authAppleEnabled !== '1' ? 'collapsed' : '' ?>" id="apple-fields">
+            <div class="form-group">
+                <label>Apple Services ID / Client ID</label>
+                <input type="text" name="settings[apple_service_id]" value="<?= htmlspecialchars(getAuthSetting('apple_service_id', 'com.tripsplit.app.signin')) ?>" placeholder="com.tripsplit.app.signin">
+                <span class="form-hint">Configured in Apple Developer Account under Identifiers &gt; Services IDs</span>
+            </div>
+            <div class="form-group">
+                <label>Apple Team ID</label>
+                <input type="text" name="settings[apple_team_id]" value="<?= htmlspecialchars(getAuthSetting('apple_team_id')) ?>" placeholder="10-character Team ID">
+            </div>
+            <div style="background: #f9fafb; border-radius: 8px; padding: 12px; font-size: 13px; color: #6b7280;">
+                <strong>Apple App Store Guideline 4.8:</strong> Apps that use third-party or social login services (like Google) must also offer Sign in with Apple as an equivalent option for iOS submissions.
             </div>
         </div>
     </div>

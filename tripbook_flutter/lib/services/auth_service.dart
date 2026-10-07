@@ -331,6 +331,41 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Apple Sign-In Flow
+  Future<void> loginWithApple({
+    required String appleId,
+    String? email,
+    String? name,
+    String? identityToken,
+  }) async {
+    _state = AuthState.loading;
+    notifyListeners();
+
+    try {
+      final res = await _apiClient.post(ApiEndpoints.appleLogin, {
+        'apple_id': appleId,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (name != null && name.isNotEmpty) 'name': name,
+        if (identityToken != null && identityToken.isNotEmpty)
+          'identity_token': identityToken,
+      });
+
+      if (res['success'] == true && res['data'] != null) {
+        await checkAuth();
+        _needsTripSelection = true;
+        notifyListeners();
+      } else {
+        _state = AuthState.unauthenticated;
+        notifyListeners();
+        throw Exception(res['message'] ?? 'Apple login failed');
+      }
+    } catch (e) {
+      _state = AuthState.unauthenticated;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   // Switch Active Trip
   Future<void> switchTrip(int tripId) async {
     try {

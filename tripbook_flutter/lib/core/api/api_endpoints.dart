@@ -25,6 +25,9 @@ class ApiEndpoints {
   // Google Auth
   static const String googleLogin = 'google-auth.php?action=google_login';
 
+  // Apple Auth
+  static const String appleLogin = 'apple-auth.php?action=apple_login';
+
   // Dashboard & Sync
   static const String dashboard = 'dashboard.php';
   static const String sync = 'sync.php';
